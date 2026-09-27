@@ -789,7 +789,7 @@ export default function Home() {
       <main className="app-shell" style={{ display: "grid", placeItems: "center", minHeight: "100vh" }}>
         <div style={{ textAlign: "center" }}>
           <div style={{ fontSize: 36, color: "var(--accent)", marginBottom: 14, animation: "pulseGlow 2s ease-in-out infinite" }}>✦</div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", letterSpacing: "-0.2px" }}>Connecting to ApplyFlow Command Center…</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", letterSpacing: "-0.2px" }}>Connecting to StratumApply Command Center…</div>
         </div>
       </main>
     );
@@ -807,7 +807,7 @@ export default function Home() {
             <div>
               <div className="eyebrow"><span className="eyebrow-line" />AUTHENTICATION & PORTALS</div>
               <h1>Career Portals & Sessions</h1>
-              <p>Sign in to your career portals once in your browser. ApplyFlow securely connects through your active browser session without storing your passwords.</p>
+              <p>Sign in to your career portals once in your browser. StratumApply securely connects through your active browser session without storing your passwords.</p>
             </div>
             <span className="privacy-chip"><Icon name="shield" /> Zero-password storage guaranteed</span>
           </section>
@@ -839,7 +839,7 @@ export default function Home() {
           <div className="portal-note" style={{ marginTop: 24 }}>
             <span>⬡</span>
             <div>
-              <strong>How Portal Sessions Work:</strong> Click &quot;Sign in / Open&quot; to open Handshake, LinkedIn, Greenhouse, Lever, or Workday in a separate tab. Once logged in, click &quot;Mark Logged In&quot;. ApplyFlow coordinates with your browser session so it can automatically discover roles and prepare applications on your behalf, pausing only for your final approval.
+              <strong>How Portal Sessions Work:</strong> Click &quot;Sign in / Open&quot; to open Handshake, LinkedIn, Greenhouse, Lever, or Workday in a separate tab. Once logged in, click &quot;Mark Logged In&quot;. StratumApply coordinates with your browser session so it can automatically discover roles and prepare applications on your behalf, pausing only for your final approval.
             </div>
           </div>
         </>
@@ -856,7 +856,7 @@ export default function Home() {
             <div>
               <div className="eyebrow"><span className="eyebrow-line" />APPLICATION ASSETS</div>
               <h1>Application Kit & Cover Letter Corpus</h1>
-              <p>Upload your resume and all your previous cover letters. ApplyFlow builds an AI style profile from your submitted letters so every newly synthesized letter mirrors your voice.</p>
+              <p>Upload your resume and all your previous cover letters. StratumApply builds an AI style profile from your submitted letters so every newly synthesized letter mirrors your voice.</p>
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <button className="text-button" onClick={() => setIsNewCLModalOpen(true)}>＋ Add Cover Letter to Corpus</button>
@@ -876,7 +876,7 @@ export default function Home() {
                 <div className="empty-state">
                   <div>▤</div>
                   <strong>No documents uploaded yet</strong>
-                  <span>Upload your resume (PDF/DOCX/TXT). ApplyFlow extracts your core skills and projects for AI job matching.</span>
+                  <span>Upload your resume (PDF/DOCX/TXT). StratumApply extracts your core skills and projects for AI job matching.</span>
                 </div>
               ) : (
                 <div className="document-list">
@@ -962,7 +962,7 @@ export default function Home() {
               <div className="document-next-card">
                 <div style={{ fontSize: 28, color: "var(--accent)" }}>✦</div>
                 <h3>Corpus-Aware AI Synthesis</h3>
-                <p>Unlike generic AI tools, ApplyFlow accesses all cover letters you&apos;ve previously submitted. It extracts your true tone, accomplishments, and narrative voice, tailoring fresh drafts without repetitive cliches.</p>
+                <p>Unlike generic AI tools, StratumApply accesses all cover letters you&apos;ve previously submitted. It extracts your true tone, accomplishments, and narrative voice, tailoring fresh drafts without repetitive cliches.</p>
               </div>
 
               <div className="rail-card" style={{ padding: 16 }}>
@@ -1522,7 +1522,7 @@ export default function Home() {
               <div className="guardrail-icon"><Icon name="shield" /></div>
               <div>
                 <h3>100% Human-in-the-Loop</h3>
-                <p>ApplyFlow discovers, matches, and curates customized cover letters, but pauses before submission. You inspect and give final approval.</p>
+                <p>StratumApply discovers, matches, and curates customized cover letters, but pauses before submission. You inspect and give final approval.</p>
               </div>
             </div>
           </div>
@@ -1566,8 +1566,8 @@ export default function Home() {
         <div className="brand-lockup">
           <div className="brand-mark">✦</div>
           <div>
-            <div className="brand-name">Apply<span>Flow</span></div>
-            <div className="brand-subtitle">AI Command Center v2</div>
+            <div className="brand-name">Stratum<span>Apply</span></div>
+            <div className="brand-subtitle">Multi-Portal Command Center</div>
           </div>
         </div>
 
@@ -1627,7 +1627,7 @@ export default function Home() {
       <main className="main-content">
         <header className="topbar">
           <div className="breadcrumb">
-            ApplyFlow <i>›</i> <strong>{activeSection === "overview" ? "Mission Control" : activeSection[0].toUpperCase() + activeSection.slice(1)}</strong>
+            StratumApply <i>›</i> <strong>{activeSection === "overview" ? "Mission Control" : activeSection[0].toUpperCase() + activeSection.slice(1)}</strong>
           </div>
           <div className="topbar-actions">
             <div className="sync-status"><span className="live-dot" />Database Synced</div>
@@ -1640,7 +1640,7 @@ export default function Home() {
           {renderWorkspacePage()}
 
           <footer className="page-footer">
-            <span><span className="footer-spark">✦</span> ApplyFlow v2 — Intelligent Human-in-the-Loop Job Application Engine</span>
+            <span><span className="footer-spark">✦</span> StratumApply v2 — Intelligent Human-in-the-Loop Job Application Engine</span>
             <button onClick={() => setActiveSection("portals")}>Manage Connected Portals</button>
           </footer>
         </div>

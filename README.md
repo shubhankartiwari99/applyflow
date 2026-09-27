@@ -1,8 +1,8 @@
 <div align="center">
 
-# ⚡ ApplyFlow
+# ⚡ StratumApply
 
-### Autonomous AI Application Command Center & Human-In-The-Loop Internship Engine
+### Autonomous Multi-Portal Career Command Center & Human-In-The-Loop Internship Engine
 
 [![Next.js 15](https://img.shields.io/badge/Next.js-15.5-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
 [![React 19](https://img.shields.io/badge/React-19-blue?style=for-the-badge&logo=react)](https://react.dev/)
@@ -24,7 +24,7 @@
 - **🎯 Multi-Portal Gateway**: Instant synchronization and direct deep-links for **Handshake** (Columbia Engineering), **GoinGlobal**, **LinkedIn**, **Greenhouse**, **Lever**, **Workday**, **Simplify**, and **Jobright AI**.
 - **🧠 AI Cover Letter Studio**: Synthesizes job-specific cover letters that learn from your previous submissions and writing style. Adjust tone between *Technical / Engineering*, *Executive & Visionary*, *Direct & Punchy*, or *Academic / Research*.
 - **📊 Algorithmic Fit Scorer**: Evaluates job descriptions against target roles (AI Engineer, ML Intern, Quant, Data Science), locations, and visa constraints to calculate a 0–100 match score.
-- **🛡️ Human-In-The-Loop Review Gate**: Zero accidental or uncontrolled submissions. ApplyFlow prepares the full dossier, matches credentials, and halts at an interactive review modal for your final stamp of approval.
+- **🛡️ Human-In-The-Loop Review Gate**: Zero accidental or uncontrolled submissions. StratumApply prepares the full dossier, matches credentials, and halts at an interactive review modal for your final stamp of approval.
 - **🔐 Privacy & Zero-Credential Architecture**: No passwords or session cookies are ever stored. Auth is handled via passwordless HMAC-hashed email OTPs.
 - **⚡ Dual-Store Data Layer**: Seamless transition between **Neon Serverless PostgreSQL** in production and an **instant In-Memory store** for zero-dependency local development.
 - **🧪 100% Tested**: Vitest unit test suite verifying cryptographic hashing, status transition state machines, portal definitions, and application preparer logic.
@@ -96,8 +96,8 @@ flowchart TD
 
 ### 1. Clone & Install
 ```bash
-git clone https://github.com/shubhankartiwari99/applyflow.git
-cd applyflow
+git clone https://github.com/shubhankartiwari99/stratumapply.git
+cd stratumapply
 npm install
 ```
 
@@ -127,9 +127,9 @@ npm run start
 
 ## 🚢 Deploying to Vercel
 
-ApplyFlow is architected for zero-configuration deployment to [Vercel](https://vercel.com):
+StratumApply is architected for zero-configuration deployment to [Vercel](https://vercel.com):
 
-1. **Import Repository**: Connect `shubhankartiwari99/applyflow` in the Vercel Dashboard.
+1. **Import Repository**: Connect `shubhankartiwari99/stratumapply` in the Vercel Dashboard.
 2. **Attach Neon Database**:
    - Install the **Neon** integration from the Vercel Marketplace, or supply an existing PostgreSQL connection string via `DATABASE_URL`.
    - The database schema (`db/schema.sql`) automatically provisions on the first authenticated request.
@@ -152,10 +152,10 @@ ApplyFlow is architected for zero-configuration deployment to [Vercel](https://v
 
 ## 🔒 Security & Privacy Model
 
-- **No Stored Passwords**: ApplyFlow never requests, collects, or stores passwords, multi-factor codes, or third-party session tokens.
+- **No Stored Passwords**: StratumApply never requests, collects, or stores passwords, multi-factor codes, or third-party session tokens.
 - **Cryptographic User IDs**: In the database, user emails are stored as irreversible HMAC hashes using your `AUTH_SECRET`.
 - **Stateless Isolation**: Each candidate gets a totally isolated workspace. Cascade delete constraints ensure complete data purge if requested.
-- **Ethical Automation**: ApplyFlow acts as an intelligence assistant and copilot. It never runs blind headless submissions or bypasses CAPTCHAs.
+- **Ethical Automation**: StratumApply acts as an intelligence assistant and copilot. It never runs blind headless submissions or bypasses CAPTCHAs.
 
 ---
 

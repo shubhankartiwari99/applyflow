@@ -21,8 +21,8 @@ export async function POST(request: Request) {
       const result = await resend.emails.send({
         from: process.env.RESEND_FROM_EMAIL,
         to: email,
-        subject: "Your ApplyFlow sign-in code",
-        text: `Your ApplyFlow sign-in code is ${challenge.code}. It expires in 10 minutes. If you did not request this, you can ignore this email.`,
+        subject: "Your StratumApply sign-in code",
+        text: `Your StratumApply sign-in code is ${challenge.code}. It expires in 10 minutes. If you did not request this, you can ignore this email.`,
       });
       if (result.error) return NextResponse.json({ error: "The verification email could not be sent. Please try again." }, { status: 502 });
       return NextResponse.json({ ok: true });

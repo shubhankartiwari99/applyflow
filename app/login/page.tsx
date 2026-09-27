@@ -82,9 +82,9 @@ export default function LoginPage() {
           </div>
           <div>
             <div className="brand-name">
-              apply<span>flow</span>
+              stratum<span>apply</span>
             </div>
-            <div className="brand-subtitle">application command center</div>
+            <div className="brand-subtitle">career &amp; internship command center</div>
           </div>
         </div>
 
@@ -208,7 +208,7 @@ export default function LoginPage() {
 
       <footer className="login-footer">
         <span>
-          <span className="footer-spark">✦</span> ApplyFlow — Your application command center
+          <span className="footer-spark">✦</span> StratumApply — Your application command center
         </span>
       </footer>
     </main>
