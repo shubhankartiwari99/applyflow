@@ -14,6 +14,9 @@ describe("engine-matcher fit score calculation", () => {
     workAuthorization: "US Citizen",
     linkedin: "https://linkedin.com/in/jordanlee",
     github: "https://github.com/jordanlee",
+    handshake: "",
+    portfolio: "",
+    coverLetterTemplate: "",
   };
 
   it("calculates a high fit score for matching role, internship, and location", async () => {

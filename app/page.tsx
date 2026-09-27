@@ -1017,7 +1017,6 @@ export default function Home() {
       if (!res.ok) throw new Error("Server rejected the connection.");
       const portalName = portals.find((p) => p.id === portalId)?.name ?? portalId;
       setPortals((c) => c.map((p) => p.id === portalId ? { ...p, connectionStatus: "connected" } : p));
-      // Also update the modal's portal data so the UI shows "connected" immediately
       setSelectedPortalForModal((prev) => prev?.id === portalId ? { ...prev, connectionStatus: "connected" } : prev);
       setNotice(`✓ ${portalName} session connected. Engine will use this session for job discovery.`);
       setTimeout(() => setSelectedPortalForModal(null), 1500);
@@ -1028,18 +1027,23 @@ export default function Home() {
     }
   }
 
-  async function togglePortalConnection(portal: Portal) {
-    const newStatus = portal.connectionStatus === "connected" ? "disconnected" : "connected";
+  async function disconnectPortal(portalId: string) {
+    setIsConnectingPortal(true);
     try {
-      await fetch("/api/portals", {
+      const res = await fetch("/api/portals", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ portal: portal.id, status: newStatus }),
+        body: JSON.stringify({ portal: portalId, status: "disconnected" }),
       });
-      setPortals((c) => c.map((p) => p.id === portal.id ? { ...p, connectionStatus: newStatus } : p));
-      setNotice(newStatus === "connected" ? `✓ ${portal.name} connected internally. Engine will use this session.` : `${portal.name} disconnected.`);
-    } catch {
-      setNotice("Could not update portal connection.");
+      if (!res.ok) throw new Error("Server rejected the disconnect.");
+      const portalName = portals.find((p) => p.id === portalId)?.name ?? portalId;
+      setPortals((c) => c.map((p) => p.id === portalId ? { ...p, connectionStatus: "disconnected" } : p));
+      setSelectedPortalForModal((prev) => prev?.id === portalId ? { ...prev, connectionStatus: "disconnected" } : prev);
+      setNotice(`${portalName} session disconnected.`);
+    } catch (e) {
+      setNotice(e instanceof Error ? e.message : "Could not disconnect session.");
+    } finally {
+      setIsConnectingPortal(false);
     }
   }
 
@@ -2807,8 +2811,8 @@ export default function Home() {
               <div style={{ padding: "12px", background: "var(--bg-tertiary)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-subtle)" }}>
                 <div style={{ fontSize: 10, fontFamily: "'JetBrains Mono', monospace", color: "var(--text-muted)" }}>QUICK CLIPBOARD</div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
-                  <button className="small-button secondary" style={{ fontSize: 10, padding: "2px 6px" }} onClick={() => { navigator.clipboard.writeText(profile.email || "st3907@columbia.edu"); setNotice("Email copied!"); }}>📋 Email</button>
-                  <button className="small-button secondary" style={{ fontSize: 10, padding: "2px 6px" }} onClick={() => { navigator.clipboard.writeText(profile.fullName || "Shubhankar Tiwari"); setNotice("Name copied!"); }}>📋 Name</button>
+                  <button className="small-button secondary" style={{ fontSize: 10, padding: "2px 6px" }} onClick={() => { navigator.clipboard.writeText(profile.email || ""); setNotice("Email copied!"); }}>📋 Email</button>
+                  <button className="small-button secondary" style={{ fontSize: 10, padding: "2px 6px" }} onClick={() => { navigator.clipboard.writeText(profile.fullName || ""); setNotice("Name copied!"); }}>📋 Name</button>
                   {profile.linkedin && <button className="small-button secondary" style={{ fontSize: 10, padding: "2px 6px" }} onClick={() => { navigator.clipboard.writeText(profile.linkedin); setNotice("LinkedIn copied!"); }}>📋 LinkedIn</button>}
                   {profile.portfolio && <button className="small-button secondary" style={{ fontSize: 10, padding: "2px 6px" }} onClick={() => { navigator.clipboard.writeText(profile.portfolio); setNotice("Portfolio copied!"); }}>📋 Portfolio</button>}
                 </div>
@@ -2819,14 +2823,25 @@ export default function Home() {
               <button className="small-button secondary" onClick={() => setSelectedPortalForModal(null)}>
                 Close
               </button>
-              <button
-                className="primary-button"
-                onClick={() => connectPortalInternally(selectedPortalForModal.id)}
-                disabled={isConnectingPortal}
-                style={{ padding: "0 20px", height: 38 }}
-              >
-                {isConnectingPortal ? "Connecting…" : (selectedPortalForModal.connectionStatus === "connected" ? "✓ Reconnect Session" : "⚡ Connect Internal Session")}
-              </button>
+              {selectedPortalForModal.connectionStatus === "connected" ? (
+                <button
+                  className="primary-button"
+                  onClick={() => disconnectPortal(selectedPortalForModal.id)}
+                  disabled={isConnectingPortal}
+                  style={{ padding: "0 20px", height: 38, background: "rgba(244,63,94,0.1)", color: "#f43f5e", border: "1px solid rgba(244,63,94,0.3)" }}
+                >
+                  {isConnectingPortal ? "Disconnecting…" : "Disconnect Session"}
+                </button>
+              ) : (
+                <button
+                  className="primary-button"
+                  onClick={() => connectPortalInternally(selectedPortalForModal.id)}
+                  disabled={isConnectingPortal}
+                  style={{ padding: "0 20px", height: 38 }}
+                >
+                  {isConnectingPortal ? "Connecting…" : "⚡ Connect Internal Session"}
+                </button>
+              )}
             </div>
           </div>
         </div>

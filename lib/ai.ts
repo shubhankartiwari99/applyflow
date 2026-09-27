@@ -195,11 +195,7 @@ Respond with JSON only: {"score": <number>, "reasoning": "<1-2 sentences>"}`;
 
 function fallbackCoverLetter(input: CoverLetterGenerationInput): CoverLetterGenerationResult {
   const name = extractName(input.profileSummary);
-  const isColumbia =
-    input.profileSummary.toLowerCase().includes("columbia") ||
-    input.resumeText.toLowerCase().includes("columbia") ||
-    (input.baseCoverLetter && input.baseCoverLetter.toLowerCase().includes("columbia"));
-  const institution = isColumbia ? "Columbia University" : "my academic and engineering program";
+  const institution = "your university/program";
 
   let bodyParagraphs: string[] = [];
 

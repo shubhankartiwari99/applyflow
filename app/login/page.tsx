@@ -146,7 +146,7 @@ export default function LoginPage() {
       <footer className="login-footer">
         <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "center", flexWrap: "wrap", fontSize: "12px" }}>
           <span>
-            <span className="footer-spark">✦</span> StratumApply — Built by <strong style={{ color: "var(--text-primary)" }}>Shubhankar Tiwari</strong> (Columbia University)
+            <span className="footer-spark">✦</span> StratumApply — Built for students
           </span>
           <span style={{ opacity: 0.35 }}>•</span>
           <a

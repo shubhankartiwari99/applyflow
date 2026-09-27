@@ -9,7 +9,6 @@ describe("engine-preparer module", () => {
   const sampleProfile: UserProfile = {
     fullName: "Alex Rivera",
     email: "alex.rivera@columbia.edu",
-    phone: "+1 (555) 234-5678",
     targetRoles: "AI Engineer, Machine Learning Intern, Data Scientist",
     locations: "New York, NY, Remote, San Francisco, CA",
     workAuthorization: "F-1 OPT (STEM Eligible)",
@@ -17,6 +16,7 @@ describe("engine-preparer module", () => {
     github: "https://github.com/alexrivera-columbia",
     portfolio: "https://alexrivera.dev",
     handshake: "https://columbiaengineering.joinhandshake.com/users/alexrivera",
+    coverLetterTemplate: "",
   };
 
   it("prepares a discovered/queued job with tailored cover letter and pre-filled form fields", async () => {
