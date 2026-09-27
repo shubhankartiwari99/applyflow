@@ -350,7 +350,6 @@ export default function Home() {
   const [reviewTone, setReviewTone] = useState<string>("technical");
   const [reviewBaseLetterId, setReviewBaseLetterId] = useState<string>("");
   const [selectedPortalForModal, setSelectedPortalForModal] = useState<Portal | null>(null);
-  const [portalGatewayTab, setPortalGatewayTab] = useState<"direct_tunnel" | "embedded_webview">("direct_tunnel");
   const [isConnectingPortal, setIsConnectingPortal] = useState(false);
 
   // Custom Companies & Global Search
@@ -1004,23 +1003,26 @@ export default function Home() {
   // ─── Actions: Portals (100% In-App Direct Connect) ───
   function openPortal(portal: Portal) {
     setSelectedPortalForModal(portal);
-    setPortalGatewayTab("direct_tunnel");
     setNotice(`Opened in-app connection gateway for ${portal.name}. Connecting directly within your workspace.`);
   }
 
   async function connectPortalInternally(portalId: string) {
     setIsConnectingPortal(true);
     try {
-      await fetch("/api/portals", {
+      const res = await fetch("/api/portals", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ portal: portalId, status: "connected" }),
       });
+      if (!res.ok) throw new Error("Server rejected the connection.");
+      const portalName = portals.find((p) => p.id === portalId)?.name ?? portalId;
       setPortals((c) => c.map((p) => p.id === portalId ? { ...p, connectionStatus: "connected" } : p));
-      setNotice(`✓ Established direct internal session with ${portalId}. Engine synchronized.`);
-      setTimeout(() => setSelectedPortalForModal(null), 1000);
-    } catch {
-      setNotice("Could not establish direct session.");
+      // Also update the modal's portal data so the UI shows "connected" immediately
+      setSelectedPortalForModal((prev) => prev?.id === portalId ? { ...prev, connectionStatus: "connected" } : prev);
+      setNotice(`✓ ${portalName} session connected. Engine will use this session for job discovery.`);
+      setTimeout(() => setSelectedPortalForModal(null), 1500);
+    } catch (e) {
+      setNotice(e instanceof Error ? e.message : "Could not establish session.");
     } finally {
       setIsConnectingPortal(false);
     }
@@ -1113,7 +1115,13 @@ export default function Home() {
           </section>
 
           <div className="portal-grid">
-            {portals.map((portal) => (
+            {portals.length === 0 ? (
+              <div className="empty-state" style={{ gridColumn: "1/-1", padding: 40 }}>
+                <div>🔗</div>
+                <strong>Loading portals…</strong>
+                <span>Connecting to your workspace session.</span>
+              </div>
+            ) : portals.map((portal) => (
               <div key={portal.id} className="portal-card">
                 <div className="portal-card-top">
                   <div className="portal-logo" style={{ background: `${portal.accent}20`, color: portal.accent }}>{portal.initials}</div>
@@ -1122,14 +1130,17 @@ export default function Home() {
                     <p>{portal.subtitle}</p>
                   </div>
                   <span className={`portal-status ${portal.connectionStatus === "connected" ? "ready" : "not-connected"}`}>
-                    {portal.connectionStatus === "connected" ? "● Connected" : "○ Disconnected"}
+                    {portal.connectionStatus === "connected" ? "● Connected" : "○ Not Connected"}
                   </span>
                 </div>
                 <div className="portal-capability"><Icon name="shield" /> {portal.capability}</div>
                 <div className="portal-card-actions">
-                  <button className="outline-button" onClick={() => openPortal(portal)}>⚡ In-App Direct Connect</button>
-                  <button className="primary-button" onClick={() => togglePortalConnection(portal)} style={{ padding: "0 12px", height: 32, fontSize: 11 }}>
-                    {portal.connectionStatus === "connected" ? "Disconnect Tunnel" : "Connect Internally ✓"}
+                  <button
+                    className={portal.connectionStatus === "connected" ? "small-button secondary" : "primary-button"}
+                    style={{ width: "100%", height: 36, fontSize: 12 }}
+                    onClick={() => openPortal(portal)}
+                  >
+                    {portal.connectionStatus === "connected" ? "✓ Connected — Manage Session" : "⚡ Connect to Session"}
                   </button>
                 </div>
               </div>
@@ -1308,9 +1319,21 @@ export default function Home() {
     // ══════════════════════════════════════════════════════════════════
     if (activeSection === "studio") {
       const selectedJob = jobs.find((j) => j.id === studioTarget.jobId);
+      // Only use a corpus letter if the user explicitly selected one (baseLetterId non-empty)
       const activeAttachedLetter =
-        coverLetters.find((cl) => cl.id === studioTarget.baseLetterId) ||
-        (coverLetters.length > 0 ? coverLetters[0] : null);
+        studioTarget.baseLetterId
+          ? coverLetters.find((cl) => cl.id === studioTarget.baseLetterId) ?? null
+          : null;
+
+      const canGenerate = !isStudioGenerating &&
+        (studioTarget.jobId || (studioTarget.company.trim() && studioTarget.role.trim()));
+      const generateLabel = isStudioGenerating
+        ? "Synthesizing with AI…"
+        : selectedJob
+          ? `⚡ Synthesize for ${selectedJob.company}`
+          : studioTarget.company.trim()
+            ? `⚡ Synthesize for ${studioTarget.company.trim()}`
+            : "⚡ Synthesize Cover Letter";
 
       const wordCount = studioResult ? studioResult.trim().split(/\s+/).filter(Boolean).length : 0;
       const readingTime = Math.max(1, Math.ceil(wordCount / 200));
@@ -1448,7 +1471,7 @@ export default function Home() {
             <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
               <div style={{ padding: "10px 14px", background: "rgba(255,255,255,0.02)", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-sm)", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
                 <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>
-                  <strong style={{ color: "#fff" }}>Candidate Identity Anchor:</strong> {profile.fullName || "Shubhankar Tiwari"} · <span style={{ color: "var(--accent)", fontWeight: 600 }}>Columbia University</span> · {profile.targetRoles || "AI/ML Engineering Intern"}
+                  <strong style={{ color: "#fff" }}>Candidate Identity Anchor:</strong> {profile.fullName || <span style={{ color: "var(--text-muted)" }}>Set your name in Profile</span>} · <span style={{ color: "var(--accent)", fontWeight: 600 }}>{profile.targetRoles?.split(",")[0] || "Set target roles in Profile"}</span>
                 </div>
                 <button className="small-button secondary" onClick={() => setActiveSection("profile")} style={{ fontSize: 10 }}>
                   Edit Profile Targeting
@@ -1495,14 +1518,19 @@ export default function Home() {
             </div>
 
             {/* Action Bar */}
-            <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 20 }}>
+            <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 20, flexWrap: "wrap" }}>
+              {!studioTarget.jobId && !studioTarget.company.trim() && (
+                <div style={{ width: "100%", fontSize: 11, color: "#f59e0b", background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.25)", borderRadius: 6, padding: "7px 12px" }}>
+                  ⚠ Select a job from the pipeline above, or enter a Company and Role to generate a tailored letter.
+                </div>
+              )}
               <button
                 className="primary-button"
                 onClick={generateStudioCoverLetter}
-                disabled={isStudioGenerating}
-                style={{ padding: "0 22px", height: 42, fontSize: 13 }}
+                disabled={!canGenerate}
+                style={{ padding: "0 22px", height: 42, fontSize: 13, opacity: canGenerate ? 1 : 0.5 }}
               >
-                {isStudioGenerating ? "Synthesizing with AI…" : `⚡ Synthesize Tailored Letter for ${selectedJob ? selectedJob.company : studioTarget.company}`}
+                {generateLabel}
               </button>
               {selectedJob && studioResult && (
                 <button
@@ -1510,7 +1538,7 @@ export default function Home() {
                   style={{ background: "linear-gradient(135deg, #00D2FF, #00A3FF)", color: "#000", height: 42 }}
                   onClick={applyStudioResultToJob}
                 >
-                  💾 Apply Directly to {selectedJob.company} Application Dossier
+                  💾 Apply to {selectedJob.company} Dossier
                 </button>
               )}
             </div>
@@ -2021,7 +2049,11 @@ export default function Home() {
                 </div>
               ) : (
                 filteredJobs.map((job) => (
-                  <div key={job.id} className="job-card">
+                  <div key={job.id} className="job-card" role="button" tabIndex={0}
+                    style={{ cursor: "pointer" }}
+                    onClick={() => openReview(job)}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openReview(job); } }}
+                  >
                     <div className="company-logo" style={{ background: `${job.accent}20`, color: job.accent }}>
                       {job.initials}
                     </div>
@@ -2047,7 +2079,7 @@ export default function Home() {
                         {job.fitScore}%
                       </strong>
                     </div>
-                    <div className="job-actions">
+                    <div className="job-actions" onClick={(e) => e.stopPropagation()}>
                       {job.status === "ready_for_review" ? (
                         <button className="small-button" onClick={() => openReview(job)}>Review & Submit</button>
                       ) : (
@@ -2137,8 +2169,8 @@ export default function Home() {
           <>
             <div className="section-heading">
               <div>
-                <h2>Engine Activity Audit</h2>
-                <p>Live execution history and background automation log</p>
+                <h2>My Activity Log</h2>
+                <p>Your personal automation history and application actions</p>
               </div>
             </div>
             <div className="full-application-panel">
@@ -2305,13 +2337,13 @@ export default function Home() {
             </div>
 
             <div className="review-split-body">
-              {/* Left Column: Job Intelligence & Form Pre-fills */}
+              {/* Left Column: Job Intelligence & Application Data */}
               <div className="review-col-left">
                 <div className="fit-breakdown">
                   <strong>{reviewingJob.fitScore}%</strong>
                   <div>
                     <h4 style={{ fontSize: 12, fontWeight: 700, color: "var(--green)" }}>AI Profile Alignment</h4>
-                    <p>Candidate background in AI/ML & engineering matches requirements for this position.</p>
+                    <p>Background in AI/ML & engineering matches requirements for this role.</p>
                   </div>
                 </div>
 
@@ -2326,25 +2358,85 @@ export default function Home() {
                   </div>
                 </div>
 
+                {/* Resume / Documents checklist */}
                 <div className="prefill-card">
-                  <h4 style={{ fontSize: 11, fontWeight: 700, color: "var(--text-secondary)", letterSpacing: "0.06em", textTransform: "uppercase" }}>Pre-filled Application Data</h4>
+                  <h4 style={{ fontSize: 11, fontWeight: 700, color: "var(--text-secondary)", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8 }}>Application Checklist</h4>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 10px", background: "var(--bg-tertiary)", borderRadius: 6, border: "1px solid var(--border-subtle)" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: 14 }}>📄</span>
+                        <div>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: "#fff" }}>Resume</div>
+                          <div style={{ fontSize: 10, color: "var(--text-muted)" }}>{documents.filter(d => d.kind === "resume").length > 0 ? documents.filter(d => d.kind === "resume")[0].name : "No resume uploaded"}</div>
+                        </div>
+                      </div>
+                      {documents.filter(d => d.kind === "resume").length > 0
+                        ? <span style={{ fontSize: 10, color: "var(--accent)", fontWeight: 700, background: "rgba(0,229,153,0.1)", padding: "2px 7px", borderRadius: 4 }}>✓ Ready</span>
+                        : <button className="small-button secondary" style={{ fontSize: 10, padding: "2px 8px" }} onClick={() => setActiveSection("documents")}>Upload ↗</button>
+                      }
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 10px", background: "var(--bg-tertiary)", borderRadius: 6, border: "1px solid var(--border-subtle)" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: 14 }}>✍️</span>
+                        <div>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: "#fff" }}>Cover Letter</div>
+                          <div style={{ fontSize: 10, color: "var(--text-muted)" }}>Tailored for {reviewingJob.company}</div>
+                        </div>
+                      </div>
+                      {reviewingJob.generatedCoverLetter
+                        ? <span style={{ fontSize: 10, color: "var(--accent)", fontWeight: 700, background: "rgba(0,229,153,0.1)", padding: "2px 7px", borderRadius: 4 }}>✓ Generated</span>
+                        : <span style={{ fontSize: 10, color: "#f59e0b", fontWeight: 700, background: "rgba(245,158,11,0.1)", padding: "2px 7px", borderRadius: 4 }}>⚠ Pending</span>
+                      }
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 10px", background: "var(--bg-tertiary)", borderRadius: 6, border: "1px solid var(--border-subtle)" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: 14 }}>👤</span>
+                        <div>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: "#fff" }}>Candidate Profile</div>
+                          <div style={{ fontSize: 10, color: "var(--text-muted)" }}>{profile.fullName || "Not set"} · {profile.email || "No email"}</div>
+                        </div>
+                      </div>
+                      {profile.fullName && profile.email
+                        ? <span style={{ fontSize: 10, color: "var(--accent)", fontWeight: 700, background: "rgba(0,229,153,0.1)", padding: "2px 7px", borderRadius: 4 }}>✓ Ready</span>
+                        : <button className="small-button secondary" style={{ fontSize: 10, padding: "2px 8px" }} onClick={() => { setReviewingJob(null); setActiveSection("profile"); }}>Complete ↗</button>
+                      }
+                    </div>
+                  </div>
+                </div>
+
+                <div className="prefill-card" style={{ marginTop: 0 }}>
+                  <h4 style={{ fontSize: 11, fontWeight: 700, color: "var(--text-secondary)", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8 }}>Pre-fill Data for Application Form</h4>
                   <div className="prefill-grid">
                     <div className="prefill-item">
-                      <strong>CANDIDATE NAME</strong>
-                      <span>{profile.fullName || "Not provided"}</span>
+                      <strong>NAME</strong>
+                      <span>{profile.fullName || "—"}</span>
                     </div>
                     <div className="prefill-item">
-                      <strong>EMAIL ADDRESS</strong>
-                      <span>{profile.email || "Not provided"}</span>
+                      <strong>EMAIL</strong>
+                      <span>{profile.email || "—"}</span>
                     </div>
                     <div className="prefill-item">
                       <strong>LINKEDIN</strong>
-                      <span>{profile.linkedin || "linkedin.com"}</span>
+                      <span style={{ wordBreak: "break-all" }}>{profile.linkedin || "—"}</span>
                     </div>
                     <div className="prefill-item">
-                      <strong>WORK AUTHORIZATION</strong>
-                      <span>{profile.workAuthorization || "US Citizen / OPT"}</span>
+                      <strong>PORTFOLIO</strong>
+                      <span style={{ wordBreak: "break-all" }}>{profile.portfolio || "—"}</span>
                     </div>
+                    <div className="prefill-item">
+                      <strong>AUTH STATUS</strong>
+                      <span>{profile.workAuthorization || "—"}</span>
+                    </div>
+                    <div className="prefill-item">
+                      <strong>PHONE</strong>
+                      <span>{profile.phone || "—"}</span>
+                    </div>
+                  </div>
+                  <div style={{ marginTop: 8, display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    <button className="small-button secondary" style={{ fontSize: 10 }} onClick={() => { navigator.clipboard.writeText(profile.email || ""); setNotice("Email copied!"); }}>📋 Copy Email</button>
+                    <button className="small-button secondary" style={{ fontSize: 10 }} onClick={() => { navigator.clipboard.writeText(profile.fullName || ""); setNotice("Name copied!"); }}>📋 Copy Name</button>
+                    {profile.linkedin && <button className="small-button secondary" style={{ fontSize: 10 }} onClick={() => { navigator.clipboard.writeText(profile.linkedin); setNotice("LinkedIn URL copied!"); }}>📋 Copy LinkedIn</button>}
+                    {profile.portfolio && <button className="small-button secondary" style={{ fontSize: 10 }} onClick={() => { navigator.clipboard.writeText(profile.portfolio); setNotice("Portfolio URL copied!"); }}>📋 Copy Portfolio</button>}
                   </div>
                 </div>
 
@@ -2357,17 +2449,17 @@ export default function Home() {
                   </div>
                 )}
 
-                <div className="review-section" style={{ background: "rgba(0, 229, 153, 0.04)", border: "1px solid rgba(0, 229, 153, 0.2)", borderRadius: "var(--radius-sm)", padding: "12px 14px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                    <h3 style={{ fontSize: 11, fontWeight: 700, color: "var(--accent)", letterSpacing: "0.06em", textTransform: "uppercase", display: "flex", alignItems: "center", gap: 6 }}>
-                      <span>⚡</span> Internal Direct Submission Channel
-                    </h3>
-                    <span className="stat-pill active">In-App API Tunnel</span>
+                {reviewingJob.applyUrl && (
+                  <div className="review-section" style={{ background: "rgba(0, 229, 153, 0.04)", border: "1px solid rgba(0, 229, 153, 0.2)", borderRadius: "var(--radius-sm)", padding: "12px 14px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                      <h3 style={{ fontSize: 11, fontWeight: 700, color: "var(--accent)", letterSpacing: "0.06em", textTransform: "uppercase" }}>Application Link</h3>
+                    </div>
+                    <a href={reviewingJob.applyUrl} target="_blank" rel="noopener noreferrer"
+                      style={{ fontSize: 11, color: "var(--accent)", wordBreak: "break-all", textDecoration: "underline" }}>
+                      {reviewingJob.applyUrl} ↗
+                    </a>
                   </div>
-                  <p style={{ fontSize: 11, color: "var(--text-secondary)", lineHeight: 1.5 }}>
-                    Target Gateway: <strong>{reviewingJob.source.toUpperCase()} Direct Integration</strong>. Submissions dispatch completely from your personal workspace without third-party browser redirects.
-                  </p>
-                </div>
+                )}
               </div>
 
               {/* Right Column: Tailored Cover Letter Editor */}
@@ -2687,116 +2779,55 @@ export default function Home() {
               </button>
             </div>
 
-            {/* Gateway Mode Tabs */}
-            <div className="gateway-tabs">
-              <button
-                className={`gateway-tab-btn${portalGatewayTab === "direct_tunnel" ? " active" : ""}`}
-                onClick={() => setPortalGatewayTab("direct_tunnel")}
-              >
-                ⚡ Direct Internal Tunnel (Columbia SSO / API Relay)
-              </button>
-              <button
-                className={`gateway-tab-btn${portalGatewayTab === "embedded_webview" ? " active" : ""}`}
-                onClick={() => setPortalGatewayTab("embedded_webview")}
-              >
-                🖥️ Embedded In-App Browser Frame
-              </button>
+            {/* Gateway Connect Panel */}
+            <div className="gateway-terminal" style={{ marginBottom: 16 }}>
+              <div className="terminal-line active">
+                <span>›</span>
+                <span>INIT: Connecting StratumApply internal session to {selectedPortalForModal.name}...</span>
+              </div>
+              <div className="terminal-line success">
+                <span>✓</span>
+                <span>IDENTITY: Candidate verified — {profile.email || "st3907@columbia.edu"}.</span>
+              </div>
+              <div className="terminal-line success">
+                <span>✓</span>
+                <span>ENCRYPTION: Session anchored to your private workspace. No data leaves StratumApply.</span>
+              </div>
+              <div className="terminal-line">
+                <span>›</span>
+                <span>STATUS: {selectedPortalForModal.connectionStatus === "connected" ? "ACTIVE — SESSION SYNCED WITH ENGINE" : "READY — CLICK CONNECT BELOW"}</span>
+              </div>
             </div>
 
-            {portalGatewayTab === "direct_tunnel" ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                <div className="gateway-terminal">
-                  <div className="terminal-line active">
-                    <span>›</span>
-                    <span>INIT: Initializing internal TLS 1.3 socket to {selectedPortalForModal.name} Gateway...</span>
-                  </div>
-                  <div className="terminal-line success">
-                    <span>✓</span>
-                    <span>IDENTITY: Columbia Engineering candidate credentials verified ({profile.email || "st3907@columbia.edu"}).</span>
-                  </div>
-                  <div className="terminal-line success">
-                    <span>✓</span>
-                    <span>ENCRYPTION: 256-bit AES-GCM session tokens anchored to your private workspace.</span>
-                  </div>
-                  <div className="terminal-line">
-                    <span>›</span>
-                    <span>STATUS: {selectedPortalForModal.connectionStatus === "connected" ? "ACTIVE INTERNAL TUNNEL ESTABLISHED" : "READY FOR DIRECT CONNECTION"}</span>
-                  </div>
-                </div>
-
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                  <div style={{ padding: "12px", background: "var(--bg-tertiary)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-subtle)" }}>
-                    <div style={{ fontSize: 10, fontFamily: "'JetBrains Mono', monospace", color: "var(--text-muted)" }}>AUTHENTICATION PROTOCOL</div>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: "#fff", marginTop: 4 }}>Direct Campus Kerberos / SSO Token</div>
-                    <div style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 2 }}>Zero external redirects or pop-up windows required.</div>
-                  </div>
-                  <div style={{ padding: "12px", background: "var(--bg-tertiary)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-subtle)" }}>
-                    <div style={{ fontSize: 10, fontFamily: "'JetBrains Mono', monospace", color: "var(--text-muted)" }}>AUTOMATED CAPABILITY</div>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: "var(--accent)", marginTop: 4 }}>{selectedPortalForModal.capability}</div>
-                    <div style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 2 }}>Ingestion & application dispatch operate within your dashboard.</div>
-                  </div>
-                </div>
-
-                <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 8 }}>
-                  <button className="small-button secondary" onClick={() => setSelectedPortalForModal(null)}>
-                    Close Gateway
-                  </button>
-                  <button
-                    className="primary-button"
-                    onClick={() => connectPortalInternally(selectedPortalForModal.id)}
-                    disabled={isConnectingPortal}
-                    style={{ padding: "0 20px", height: 38 }}
-                  >
-                    {isConnectingPortal ? "Establishing Secure Tunnel…" : (selectedPortalForModal.connectionStatus === "connected" ? "✓ Refresh Internal Tunnel" : "⚡ Establish Direct Internal Tunnel")}
-                  </button>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+              <div style={{ padding: "12px", background: "var(--bg-tertiary)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-subtle)" }}>
+                <div style={{ fontSize: 10, fontFamily: "'JetBrains Mono', monospace", color: "var(--text-muted)" }}>CAPABILITY UNLOCKED</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--accent)", marginTop: 4 }}>{selectedPortalForModal.capability}</div>
+              </div>
+              <div style={{ padding: "12px", background: "var(--bg-tertiary)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-subtle)" }}>
+                <div style={{ fontSize: 10, fontFamily: "'JetBrains Mono', monospace", color: "var(--text-muted)" }}>QUICK CLIPBOARD</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
+                  <button className="small-button secondary" style={{ fontSize: 10, padding: "2px 6px" }} onClick={() => { navigator.clipboard.writeText(profile.email || "st3907@columbia.edu"); setNotice("Email copied!"); }}>📋 Email</button>
+                  <button className="small-button secondary" style={{ fontSize: 10, padding: "2px 6px" }} onClick={() => { navigator.clipboard.writeText(profile.fullName || "Shubhankar Tiwari"); setNotice("Name copied!"); }}>📋 Name</button>
+                  {profile.linkedin && <button className="small-button secondary" style={{ fontSize: 10, padding: "2px 6px" }} onClick={() => { navigator.clipboard.writeText(profile.linkedin); setNotice("LinkedIn copied!"); }}>📋 LinkedIn</button>}
+                  {profile.portfolio && <button className="small-button secondary" style={{ fontSize: 10, padding: "2px 6px" }} onClick={() => { navigator.clipboard.writeText(profile.portfolio); setNotice("Portfolio copied!"); }}>📋 Portfolio</button>}
                 </div>
               </div>
-            ) : (
-              <div className="embedded-browser-frame">
-                <div className="embedded-browser-bar">
-                  <div className="embedded-url-pill">
-                    <span style={{ color: "var(--accent)" }}>🔒</span>
-                    <span style={{ color: "#fff" }}>{selectedPortalForModal.loginUrl}</span>
-                    <span style={{ marginLeft: "auto", fontSize: 9, color: "var(--accent)", background: "rgba(0,229,153,0.12)", padding: "1px 6px", borderRadius: 3 }}>
-                      SANDBOXED WEBVIEW
-                    </span>
-                  </div>
-                  <button className="small-button secondary" onClick={() => setNotice("Reloaded internal webview frame.")} style={{ padding: "4px 8px", fontSize: 10 }}>
-                    ↺ Reload
-                  </button>
-                </div>
+            </div>
 
-                <div className="gateway-copilot-row">
-                  <span style={{ fontSize: 10, fontFamily: "'JetBrains Mono', monospace", color: "var(--text-muted)" }}>IN-APP COPILOT INJECTION:</span>
-                  <button className="small-button secondary" onClick={() => { navigator.clipboard.writeText(profile.email || "st3907@columbia.edu"); setNotice("Copied Columbia email to clipboard!"); }} style={{ fontSize: 10, padding: "2px 8px" }}>
-                    📋 Copy Email
-                  </button>
-                  <button className="small-button secondary" onClick={() => { navigator.clipboard.writeText(profile.fullName || "Shubhankar Tiwari"); setNotice("Copied Full Name to clipboard!"); }} style={{ fontSize: 10, padding: "2px 8px" }}>
-                    📋 Copy Name
-                  </button>
-                  <button className="small-button secondary" onClick={() => { navigator.clipboard.writeText(profile.coverLetterTemplate); setNotice("Copied Default Cover Letter to clipboard!"); }} style={{ fontSize: 10, padding: "2px 8px" }}>
-                    📋 Copy Cover Letter
-                  </button>
-                </div>
-
-                <div style={{ height: 300, background: "#06080d", display: "grid", placeItems: "center", padding: 24, textAlign: "center" }}>
-                  <div>
-                    <div style={{ fontSize: 32, marginBottom: 8 }}>{selectedPortalForModal.initials}</div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>{selectedPortalForModal.name} Direct Console</div>
-                    <p style={{ fontSize: 12, color: "var(--text-secondary)", maxWidth: 440, margin: "6px auto 14px" }}>
-                      Embedded directly within StratumApply. Your session runs inside this sandboxed container without navigating away from your workspace.
-                    </p>
-                    <button
-                      className="primary-button"
-                      onClick={() => connectPortalInternally(selectedPortalForModal.id)}
-                      disabled={isConnectingPortal}
-                    >
-                      {isConnectingPortal ? "Connecting…" : "✓ Confirm In-App Session Connected"}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <button className="small-button secondary" onClick={() => setSelectedPortalForModal(null)}>
+                Close
+              </button>
+              <button
+                className="primary-button"
+                onClick={() => connectPortalInternally(selectedPortalForModal.id)}
+                disabled={isConnectingPortal}
+                style={{ padding: "0 20px", height: 38 }}
+              >
+                {isConnectingPortal ? "Connecting…" : (selectedPortalForModal.connectionStatus === "connected" ? "✓ Reconnect Session" : "⚡ Connect Internal Session")}
+              </button>
+            </div>
           </div>
         </div>
       )}
