@@ -122,6 +122,7 @@ type CareerSite = {
   category: string;
   accent: string;
   initials: string;
+  isCustom?: boolean;
 };
 
 const DEFAULT_COVER_LETTER = `Dear Hiring Manager,
@@ -136,6 +137,7 @@ Sincerely,
 {NAME}`;
 
 const careerSites: CareerSite[] = [
+  // Big Tech & Cloud Infrastructure
   { company: "Google", url: "https://www.google.com/about/careers/applications/jobs/results", category: "Big Tech", accent: "#4285f4", initials: "G" },
   { company: "Meta", url: "https://www.metacareers.com/jobs", category: "Big Tech", accent: "#1877f2", initials: "M" },
   { company: "Apple", url: "https://jobs.apple.com/en-us/search", category: "Big Tech", accent: "#a2aaad", initials: "A" },
@@ -143,29 +145,88 @@ const careerSites: CareerSite[] = [
   { company: "Microsoft", url: "https://careers.microsoft.com/v2/global/en/search", category: "Big Tech", accent: "#00a4ef", initials: "MS" },
   { company: "NVIDIA", url: "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite", category: "Big Tech", accent: "#76b900", initials: "NV" },
   { company: "Netflix", url: "https://jobs.netflix.com/search", category: "Big Tech", accent: "#e50914", initials: "NF" },
-  { company: "Anthropic", url: "https://www.anthropic.com/careers", category: "AI / ML", accent: "#d4a574", initials: "AN" },
+  { company: "Intel", url: "https://jobs.intel.com/en/search-jobs", category: "Big Tech", accent: "#0071c5", initials: "IN" },
+  { company: "AMD", url: "https://careers.amd.com/careers-home", category: "Big Tech", accent: "#ed1c24", initials: "AMD" },
+  { company: "Cloudflare", url: "https://www.cloudflare.com/careers/jobs/", category: "Big Tech", accent: "#f38020", initials: "CF" },
+  { company: "Salesforce", url: "https://careers.salesforce.com/en/", category: "Big Tech", accent: "#00a1e0", initials: "SF" },
+  { company: "Adobe", url: "https://careers.adobe.com/us/en", category: "Big Tech", accent: "#ff0000", initials: "AD" },
+  { company: "Oracle", url: "https://www.oracle.com/corporate/careers/", category: "Big Tech", accent: "#f80000", initials: "OR" },
+  { company: "Cisco", url: "https://jobs.cisco.com/jobs/SearchJobs", category: "Big Tech", accent: "#1ba0d7", initials: "CS" },
+
+  // AI / ML Giants & Frontier Labs
   { company: "OpenAI", url: "https://openai.com/careers/search", category: "AI / ML", accent: "#10a37f", initials: "OA" },
+  { company: "Anthropic", url: "https://www.anthropic.com/careers", category: "AI / ML", accent: "#d4a574", initials: "AN" },
   { company: "DeepMind", url: "https://deepmind.google/about/careers/", category: "AI / ML", accent: "#4a90d9", initials: "DM" },
+  { company: "Cursor / Anysphere", url: "https://www.cursor.com/careers", category: "AI / ML", accent: "#5865f2", initials: "CU" },
+  { company: "Perplexity AI", url: "https://www.perplexity.ai/careers", category: "AI / ML", accent: "#22b8cd", initials: "PX" },
   { company: "Scale AI", url: "https://scale.com/careers", category: "AI / ML", accent: "#6b5cff", initials: "SC" },
   { company: "Hugging Face", url: "https://apply.workable.com/huggingface/", category: "AI / ML", accent: "#ffd21e", initials: "HF" },
   { company: "Databricks", url: "https://www.databricks.com/company/careers/open-positions", category: "AI / ML", accent: "#ff3621", initials: "DB" },
   { company: "Cohere", url: "https://cohere.com/careers", category: "AI / ML", accent: "#39594d", initials: "CO" },
   { company: "Mistral AI", url: "https://mistral.ai/careers/", category: "AI / ML", accent: "#f7d046", initials: "MI" },
+  { company: "Runway", url: "https://runwayml.com/careers/", category: "AI / ML", accent: "#00e599", initials: "RW" },
+  { company: "ElevenLabs", url: "https://elevenlabs.io/careers", category: "AI / ML", accent: "#ffffff", initials: "EL" },
+  { company: "Midjourney", url: "https://www.midjourney.com/careers", category: "AI / ML", accent: "#8e44ad", initials: "MJ" },
+  { company: "Character.AI", url: "https://character.ai/careers", category: "AI / ML", accent: "#29b6f6", initials: "CA" },
+  { company: "Stability AI", url: "https://stability.ai/careers", category: "AI / ML", accent: "#9b59b6", initials: "SA" },
+  { company: "Together AI", url: "https://www.together.ai/careers", category: "AI / ML", accent: "#00c2ff", initials: "TG" },
+  { company: "Replicate", url: "https://replicate.com/careers", category: "AI / ML", accent: "#e91e63", initials: "RP" },
+  { company: "Pinecone", url: "https://www.pinecone.io/careers/", category: "AI / ML", accent: "#0047ff", initials: "PC" },
+  { company: "Weights & Biases", url: "https://wandb.ai/careers", category: "AI / ML", accent: "#ffbe00", initials: "WB" },
+  { company: "LangChain", url: "https://www.langchain.com/careers", category: "AI / ML", accent: "#2ecc71", initials: "LC" },
+
+  // FinTech & Quantitative Trading
   { company: "Jane Street", url: "https://www.janestreet.com/join-jane-street/open-roles/", category: "FinTech & Quant", accent: "#005a9c", initials: "JS" },
   { company: "Citadel", url: "https://www.citadel.com/careers/open-opportunities/", category: "FinTech & Quant", accent: "#003b71", initials: "CD" },
   { company: "Two Sigma", url: "https://www.twosigma.com/careers/", category: "FinTech & Quant", accent: "#232d3f", initials: "TS" },
+  { company: "Jump Trading", url: "https://www.jumptrading.com/careers/", category: "FinTech & Quant", accent: "#e67e22", initials: "JT" },
+  { company: "Hudson River Trading", url: "https://www.hudsonrivertrading.com/careers/", category: "FinTech & Quant", accent: "#ff5722", initials: "HRT" },
+  { company: "D.E. Shaw", url: "https://www.deshaw.com/careers", category: "FinTech & Quant", accent: "#1a5276", initials: "DES" },
+  { company: "Point72", url: "https://www.point72.com/careers/", category: "FinTech & Quant", accent: "#0e6655", initials: "P72" },
+  { company: "Millennium", url: "https://www.mlp.com/careers/", category: "FinTech & Quant", accent: "#1b4f72", initials: "ML" },
+  { company: "Optiver", url: "https://optiver.com/working-at-optiver/career-opportunities/", category: "FinTech & Quant", accent: "#e74c3c", initials: "OP" },
+  { company: "IMC Trading", url: "https://careers.imc.com/", category: "FinTech & Quant", accent: "#3498db", initials: "IMC" },
+  { company: "Five Rings", url: "https://fiverings.com/careers/", category: "FinTech & Quant", accent: "#f39c12", initials: "FR" },
+  { company: "Virtu Financial", url: "https://www.virtu.com/careers/", category: "FinTech & Quant", accent: "#27ae60", initials: "VF" },
   { company: "Stripe", url: "https://stripe.com/jobs/search", category: "FinTech & Quant", accent: "#635bff", initials: "ST" },
   { company: "Robinhood", url: "https://robinhood.com/us/en/careers/openings/", category: "FinTech & Quant", accent: "#00c805", initials: "RH" },
   { company: "Bloomberg", url: "https://www.bloomberg.com/company/careers/early-career/", category: "FinTech & Quant", accent: "#414141", initials: "BB" },
+  { company: "Ramp", url: "https://ramp.com/careers", category: "FinTech & Quant", accent: "#ceff00", initials: "RP" },
   { company: "Brex", url: "https://www.brex.com/careers", category: "FinTech & Quant", accent: "#f25c05", initials: "BX" },
+  { company: "Plaid", url: "https://plaid.com/careers/", category: "FinTech & Quant", accent: "#111111", initials: "PLD" },
+  { company: "Coinbase", url: "https://www.coinbase.com/careers", category: "FinTech & Quant", accent: "#0052ff", initials: "CB" },
+  { company: "Block / Square", url: "https://block.xyz/careers", category: "FinTech & Quant", accent: "#222222", initials: "SQ" },
+  { company: "Affirm", url: "https://www.affirm.com/careers", category: "FinTech & Quant", accent: "#00a887", initials: "AF" },
+
+  // Startups & High Growth Tech
   { company: "Figma", url: "https://www.figma.com/careers/", category: "Startups & Growth", accent: "#f24e1e", initials: "FG" },
   { company: "Notion", url: "https://www.notion.so/careers", category: "Startups & Growth", accent: "#787878", initials: "NO" },
   { company: "Vercel", url: "https://vercel.com/careers", category: "Startups & Growth", accent: "#a0a0a0", initials: "VC" },
+  { company: "Linear", url: "https://linear.app/careers", category: "Startups & Growth", accent: "#5e6ad2", initials: "LN" },
+  { company: "Supabase", url: "https://supabase.com/careers", category: "Startups & Growth", accent: "#3ecf8e", initials: "SB" },
+  { company: "Retool", url: "https://retool.com/careers", category: "Startups & Growth", accent: "#3c3c3c", initials: "RT" },
   { company: "Datadog", url: "https://careers.datadoghq.com/all-jobs/", category: "Startups & Growth", accent: "#632ca6", initials: "DD" },
   { company: "Snowflake", url: "https://careers.snowflake.com/us/en/search-results", category: "Startups & Growth", accent: "#29b5e8", initials: "SF" },
   { company: "Palantir", url: "https://www.palantir.com/careers/", category: "Startups & Growth", accent: "#a0a0a0", initials: "PL" },
+  { company: "DoorDash", url: "https://careers.doordash.com/", category: "Startups & Growth", accent: "#ff3008", initials: "DD" },
+  { company: "Uber", url: "https://www.uber.com/us/en/careers/", category: "Startups & Growth", accent: "#111111", initials: "UB" },
+  { company: "Airbnb", url: "https://careers.airbnb.com/", category: "Startups & Growth", accent: "#ff5a5f", initials: "AB" },
+  { company: "Pinterest", url: "https://www.pinterestcareers.com/", category: "Startups & Growth", accent: "#e60023", initials: "PI" },
+  { company: "Reddit", url: "https://www.redditinc.com/careers", category: "Startups & Growth", accent: "#ff4500", initials: "RD" },
+  { company: "Discord", url: "https://discord.com/careers", category: "Startups & Growth", accent: "#5865f2", initials: "DC" },
+  { company: "Slack", url: "https://slack.com/careers", category: "Startups & Growth", accent: "#4a154b", initials: "SL" },
+  { company: "Canva", url: "https://www.canva.com/careers/", category: "Startups & Growth", accent: "#00c4cc", initials: "CV" },
+  { company: "Postman", url: "https://www.postman.com/company/careers/", category: "Startups & Growth", accent: "#ff6c37", initials: "PM" },
+  { company: "GitHub", url: "https://github.com/about/careers", category: "Startups & Growth", accent: "#ffffff", initials: "GH" },
+  { company: "GitLab", url: "https://about.gitlab.com/jobs/careers/", category: "Startups & Growth", accent: "#fc6d26", initials: "GL" },
+
+  // Engineering, Robotics & Deep Tech
   { company: "SpaceX", url: "https://www.spacex.com/careers/", category: "Engineering", accent: "#005288", initials: "SX" },
   { company: "Tesla", url: "https://www.tesla.com/careers/search", category: "Engineering", accent: "#cc0000", initials: "TE" },
+  { company: "Anduril Industries", url: "https://www.anduril.com/careers/", category: "Engineering", accent: "#1c2833", initials: "AD" },
+  { company: "Boston Dynamics", url: "https://bostondynamics.com/careers/", category: "Engineering", accent: "#f1c40f", initials: "BD" },
+  { company: "Neuralink", url: "https://neuralink.com/careers/", category: "Engineering", accent: "#2c3e50", initials: "NL" },
+  { company: "Relativity Space", url: "https://www.relativityspace.com/careers", category: "Engineering", accent: "#e74c3c", initials: "RS" },
 ];
 
 function Icon({ name }: { name: string }) {
@@ -292,6 +353,19 @@ export default function Home() {
   const [portalGatewayTab, setPortalGatewayTab] = useState<"direct_tunnel" | "embedded_webview">("direct_tunnel");
   const [isConnectingPortal, setIsConnectingPortal] = useState(false);
 
+  // Custom Companies & Global Search
+  const [customCareerSites, setCustomCareerSites] = useState<CareerSite[]>([]);
+  const [searchCompanyQuery, setSearchCompanyQuery] = useState("");
+  const [isAddCompanyModalOpen, setIsAddCompanyModalOpen] = useState(false);
+  const [addCompanyForm, setAddCompanyForm] = useState({
+    input: "",
+    company: "",
+    url: "",
+    category: "AI / ML",
+    isResolving: false,
+    resolveError: "",
+  });
+
   // ─── Keydown (Escape) ───
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -300,10 +374,24 @@ export default function Home() {
         setSelectedPortalForModal(null);
         setIsCustomModalOpen(false);
         setIsNewCLModalOpen(false);
+        setIsAddCompanyModalOpen(false);
       }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  // ─── LocalStorage: Custom Companies ───
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("stratumapply_custom_companies");
+      if (saved) {
+        const parsed = JSON.parse(saved) as CareerSite[];
+        if (Array.isArray(parsed)) setCustomCareerSites(parsed);
+      }
+    } catch {
+      // ignore
+    }
   }, []);
 
   // ─── Authentication Check ───
@@ -433,12 +521,27 @@ export default function Home() {
     { label: "Portals Logged In", value: portals.filter((p) => p.connectionStatus === "connected").length, change: `of ${portals.length} platforms`, tone: "blue", icon: "🔗" },
   ], [jobs, jobCounts, portals]);
 
+  const allCareerSites = useMemo(() => {
+    return [...customCareerSites, ...careerSites];
+  }, [customCareerSites]);
+
   const careerCategories = useMemo(() => {
-    return ["All", ...new Set(careerSites.map((s) => s.category))];
-  }, []);
+    return ["All", "AI / ML", "Big Tech", "FinTech & Quant", "Startups & Growth", "Engineering", ...(customCareerSites.length > 0 ? ["Custom"] : [])];
+  }, [customCareerSites]);
+
   const filteredCareerSites = useMemo(() => {
-    return careerFilter === "All" ? careerSites : careerSites.filter((s) => s.category === careerFilter);
-  }, [careerFilter]);
+    let list = allCareerSites;
+    if (careerFilter === "Custom") {
+      list = customCareerSites;
+    } else if (careerFilter !== "All") {
+      list = allCareerSites.filter((s) => s.category === careerFilter);
+    }
+    if (searchCompanyQuery.trim()) {
+      const q = searchCompanyQuery.toLowerCase().trim();
+      list = list.filter((s) => s.company.toLowerCase().includes(q) || s.category.toLowerCase().includes(q) || s.url.toLowerCase().includes(q));
+    }
+    return list;
+  }, [allCareerSites, customCareerSites, careerFilter, searchCompanyQuery]);
 
   // ─── Actions: Start Automation Engine ───
   async function startEngine() {
@@ -547,6 +650,52 @@ export default function Home() {
       }
     } catch {
       setNotice("Could not track company.");
+    }
+  }
+
+  function saveCustomCompany(site: CareerSite) {
+    const updated = [site, ...customCareerSites.filter((s) => s.company.toLowerCase() !== site.company.toLowerCase())];
+    setCustomCareerSites(updated);
+    try {
+      localStorage.setItem("stratumapply_custom_companies", JSON.stringify(updated));
+    } catch {}
+    setNotice(`✓ Added ${site.company} to your tracked companies directory!`);
+    setIsAddCompanyModalOpen(false);
+  }
+
+  function removeCustomCompany(companyName: string) {
+    const updated = customCareerSites.filter((s) => s.company !== companyName);
+    setCustomCareerSites(updated);
+    try {
+      localStorage.setItem("stratumapply_custom_companies", JSON.stringify(updated));
+    } catch {}
+    setNotice(`Removed ${companyName} from custom tracked companies.`);
+  }
+
+  async function resolveOnlineCompany() {
+    if (!addCompanyForm.input.trim()) return;
+    setAddCompanyForm((f) => ({ ...f, isResolving: true, resolveError: "" }));
+    try {
+      const r = await fetch("/api/discovery/resolve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input: addCompanyForm.input.trim() }),
+      });
+      if (r.ok) {
+        const d = (await r.json()) as { site: CareerSite };
+        setAddCompanyForm((f) => ({
+          ...f,
+          company: d.site.company,
+          url: d.site.url,
+          category: d.site.category,
+          isResolving: false,
+        }));
+      } else {
+        const err = (await r.json().catch(() => ({}))) as { error?: string };
+        setAddCompanyForm((f) => ({ ...f, isResolving: false, resolveError: err.error || "Could not resolve company." }));
+      }
+    } catch {
+      setAddCompanyForm((f) => ({ ...f, isResolving: false, resolveError: "Network error resolving company." }));
     }
   }
 
@@ -1491,8 +1640,8 @@ export default function Home() {
             <div className="source-card manual">
               <span className="source-card-icon blue-tint">◎</span>
               <div>
-                <strong>30+ Tech & FinTech Giants</strong>
-                <p>One-click direct queueing for Big Tech & Quant firms.</p>
+                <strong>80+ Tech & FinTech Giants</strong>
+                <p>One-click direct queueing for Big Tech, AI Labs & Quant firms.</p>
               </div>
               <span className="source-state">Track</span>
             </div>
@@ -1500,18 +1649,82 @@ export default function Home() {
 
           <div className="subpage-section-heading">
             <div>
-              <h2>Tracked Companies Directory</h2>
-              <p>Click &quot;＋&quot; on any company to immediately add its engineering openings to your queue.</p>
+              <h2>Tracked Companies Directory ({allCareerSites.length})</h2>
+              <p>Search, track, or auto-extract custom companies and portals. Click &quot;＋&quot; on any company to queue opportunities.</p>
+            </div>
+            <button
+              className="primary-button"
+              style={{ fontSize: 12, height: 34, padding: "0 14px", display: "flex", alignItems: "center", gap: 6 }}
+              onClick={() => {
+                setAddCompanyForm({ input: searchCompanyQuery, company: searchCompanyQuery, url: "", category: "AI / ML", isResolving: false, resolveError: "" });
+                setIsAddCompanyModalOpen(true);
+              }}
+            >
+              ＋ Add Custom Company / Site
+            </button>
+          </div>
+
+          {/* Live Search & Filter Bar */}
+          <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 14, flexWrap: "wrap" }}>
+            <div style={{ flex: 1, minWidth: 260, position: "relative" }}>
+              <input
+                className="login-input"
+                style={{ width: "100%", paddingLeft: 34, height: 38, fontSize: 13 }}
+                placeholder="🔍 Search 80+ companies by name, category, or URL..."
+                value={searchCompanyQuery}
+                onChange={(e) => setSearchCompanyQuery(e.target.value)}
+              />
+              {searchCompanyQuery && (
+                <button
+                  onClick={() => setSearchCompanyQuery("")}
+                  style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 14 }}
+                  title="Clear search"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+            <div className="career-filter-bar" style={{ margin: 0 }}>
+              {careerCategories.map((cat) => (
+                <button key={cat} className={`filter-tab${careerFilter === cat ? " active" : ""}`} onClick={() => setCareerFilter(cat)}>
+                  {cat}
+                </button>
+              ))}
             </div>
           </div>
 
-          <div className="career-filter-bar">
-            {careerCategories.map((cat) => (
-              <button key={cat} className={`filter-tab${careerFilter === cat ? " active" : ""}`} onClick={() => setCareerFilter(cat)}>
-                {cat}
+          {/* Prompt to add if search query yields 0 results */}
+          {searchCompanyQuery && filteredCareerSites.length === 0 && (
+            <div style={{
+              padding: "16px 20px",
+              marginBottom: 18,
+              borderRadius: 8,
+              border: "1px dashed rgba(0, 229, 153, 0.4)",
+              background: "rgba(0, 229, 153, 0.05)",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: 12
+            }}>
+              <div>
+                <strong style={{ color: "#fff", fontSize: 13 }}>No company named &quot;{searchCompanyQuery}&quot; found in standard catalog</strong>
+                <span style={{ display: "block", fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
+                  Add it as a custom tracked company. We can auto-resolve its career portal online so you can queue roles immediately.
+                </span>
+              </div>
+              <button
+                className="primary-button"
+                style={{ height: 32, fontSize: 11, padding: "0 14px" }}
+                onClick={() => {
+                  setAddCompanyForm({ input: searchCompanyQuery, company: searchCompanyQuery, url: "", category: "AI / ML", isResolving: false, resolveError: "" });
+                  setIsAddCompanyModalOpen(true);
+                }}
+              >
+                ⚡ Auto-Resolve & Track &quot;{searchCompanyQuery}&quot;
               </button>
-            ))}
-          </div>
+            </div>
+          )}
 
           <div className="career-grid">
             {filteredCareerSites.map((site) => (
@@ -1519,12 +1732,29 @@ export default function Home() {
                 <a href={site.url} target="_blank" rel="noopener noreferrer" className="career-card">
                   <div className="career-logo" style={{ background: `${site.accent}20`, color: site.accent }}>{site.initials}</div>
                   <div className="career-info">
-                    <strong>{site.company}</strong>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <strong>{site.company}</strong>
+                      {site.isCustom && (
+                        <span style={{ fontSize: 9, background: "rgba(0, 229, 153, 0.15)", color: "var(--accent)", padding: "1px 5px", borderRadius: 3, fontWeight: 700 }}>Custom</span>
+                      )}
+                    </div>
                     <span>{site.category}</span>
                   </div>
                   <span className="career-arrow">↗</span>
                 </a>
-                <button className="career-track-btn" onClick={() => trackCompany(site)} title={`Track ${site.company}`}>＋</button>
+                <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                  <button className="career-track-btn" onClick={() => trackCompany(site)} title={`Track & Queue ${site.company}`}>＋</button>
+                  {site.isCustom && (
+                    <button
+                      className="doc-delete-btn"
+                      onClick={() => removeCustomCompany(site.company)}
+                      title={`Remove ${site.company}`}
+                      style={{ height: 32, width: 28, fontSize: 11 }}
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -2258,6 +2488,100 @@ export default function Home() {
                 <button type="submit" className="primary-button">Add to Application Queue</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── ADD CUSTOM COMPANY / CAREER SITE MODAL ── */}
+      {isAddCompanyModalOpen && (
+        <div className="review-overlay" onClick={(e) => { if (e.target === e.currentTarget) setIsAddCompanyModalOpen(false); }}>
+          <div className="review-panel" style={{ maxWidth: 540 }}>
+            <div className="review-header">
+              <div>
+                <h2>Add Company to Tracked Directory</h2>
+                <p style={{ color: "var(--text-tertiary)", fontSize: 12, marginTop: 4 }}>
+                  Enter a website domain, company name, or ATS board URL (Greenhouse, Lever). StratumApply will auto-resolve its portal or you can configure it manually.
+                </p>
+              </div>
+              <button className="review-close" onClick={() => setIsAddCompanyModalOpen(false)}><Icon name="close" /></button>
+            </div>
+            <div className="review-body">
+              {/* Online Resolution Bar */}
+              <div style={{
+                marginBottom: 16,
+                padding: "14px 16px",
+                border: "1px dashed rgba(0, 229, 153, 0.4)",
+                borderRadius: 8,
+                background: "rgba(0, 229, 153, 0.04)",
+              }}>
+                <label style={{ display: "block", fontSize: 10, fontFamily: "'JetBrains Mono', monospace", color: "var(--cyan)", marginBottom: 6 }}>
+                  ⚡ ONLINE AUTO-RESOLVE (DOMAIN OR ATS URL)
+                </label>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input
+                    className="login-input"
+                    style={{ flex: 1 }}
+                    placeholder="e.g. linear.app, ramp.com, or greenhouse/lever URL"
+                    value={addCompanyForm.input}
+                    onChange={(e) => setAddCompanyForm((f) => ({ ...f, input: e.target.value }))}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); resolveOnlineCompany(); } }}
+                  />
+                  <button
+                    type="button"
+                    className="primary-button"
+                    style={{ height: 38, fontSize: 11, padding: "0 14px", flexShrink: 0 }}
+                    onClick={resolveOnlineCompany}
+                    disabled={addCompanyForm.isResolving || !addCompanyForm.input.trim()}
+                  >
+                    {addCompanyForm.isResolving ? "Resolving…" : "Auto-Resolve"}
+                  </button>
+                </div>
+                {addCompanyForm.resolveError && (
+                  <div style={{ fontSize: 11, color: "var(--danger)", marginTop: 6 }}>
+                    {addCompanyForm.resolveError}
+                  </div>
+                )}
+              </div>
+
+              {/* Form Fields */}
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                if (!addCompanyForm.company.trim() || !addCompanyForm.url.trim()) return;
+                const companyName = addCompanyForm.company.trim();
+                const initials = companyName.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("") || companyName.slice(0, 2).toUpperCase();
+                saveCustomCompany({
+                  company: companyName,
+                  url: addCompanyForm.url.trim(),
+                  category: addCompanyForm.category,
+                  accent: "#00E599",
+                  initials,
+                  isCustom: true,
+                });
+              }}>
+                <div className="custom-modal-grid">
+                  <label>COMPANY NAME<input value={addCompanyForm.company} onChange={(e) => setAddCompanyForm((f) => ({ ...f, company: e.target.value }))} placeholder="e.g. Linear" required /></label>
+                  <label>CAREER PAGE / ATS URL<input value={addCompanyForm.url} onChange={(e) => setAddCompanyForm((f) => ({ ...f, url: e.target.value }))} placeholder="https://linear.app/careers" required /></label>
+                  <label>INDUSTRY CATEGORY
+                    <select
+                      className="login-input"
+                      value={addCompanyForm.category}
+                      onChange={(e) => setAddCompanyForm((f) => ({ ...f, category: e.target.value }))}
+                      style={{ background: "var(--bg-tertiary)", cursor: "pointer", width: "100%", height: 38 }}
+                    >
+                      <option value="AI / ML">AI / ML</option>
+                      <option value="Big Tech">Big Tech</option>
+                      <option value="FinTech & Quant">FinTech & Quant</option>
+                      <option value="Startups & Growth">Startups & Growth</option>
+                      <option value="Engineering">Engineering & Deep Tech</option>
+                    </select>
+                  </label>
+                </div>
+                <div style={{ marginTop: 20, display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                  <button type="button" className="small-button secondary" onClick={() => setIsAddCompanyModalOpen(false)}>Cancel</button>
+                  <button type="submit" className="primary-button">Track This Company ↗</button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       )}
