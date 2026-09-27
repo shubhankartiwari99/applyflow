@@ -1349,7 +1349,7 @@ export default function Home() {
               <div className="eyebrow"><span className="eyebrow-line" />INTELLIGENT SYNTHESIZER</div>
               <h1>AI Cover Letter Studio</h1>
               <p>
-                Link any target job from your pipeline or enter one ad-hoc. The AI anchors to your attached base cover letter and Columbia profile to synthesize an authentic, tailored application.
+                Link any target job from your pipeline or enter one ad-hoc. The AI anchors to your attached base cover letter and profile to synthesize an authentic, tailored application.
               </p>
             </div>
             <div style={{ display: "flex", gap: 10 }}>
@@ -1491,7 +1491,7 @@ export default function Home() {
                   style={{ width: "100%" }}
                   value={studioTarget.customFocus}
                   onChange={(e) => setStudioTarget((t) => ({ ...t, customFocus: e.target.value }))}
-                  placeholder="e.g. Highlight PyTorch distributed training, CUDA benchmarks, and Columbia lab research"
+                  placeholder="e.g. Highlight PyTorch distributed training, CUDA benchmarks, and lab research"
                 />
               </div>
             </div>
@@ -1506,7 +1506,7 @@ export default function Home() {
                   { id: "technical", label: "⚡ Deep Tech & ML", desc: "Architecture, frameworks, CUDA, performance" },
                   { id: "impact", label: "🚀 Founder & Impact", desc: "0-to-1 execution, fast shipping, metrics" },
                   { id: "quantitative", label: "📊 Quant & Rigor", desc: "Mathematical grounding, empirical metrics" },
-                  { id: "academic", label: "🎓 Academic & Research", desc: "Columbia lab coursework, novel literature" },
+                  { id: "academic", label: "🎓 Academic & Research", desc: "Lab coursework, novel literature" },
                 ].map((t) => (
                   <button
                     key={t.id}
@@ -2435,6 +2435,12 @@ export default function Home() {
                       <strong>PHONE</strong>
                       <span>{profile.phone || "—"}</span>
                     </div>
+                    <div className="prefill-item">
+                      <strong>ACTIVE RESUME</strong>
+                      <span style={{ color: documents.length > 0 ? "var(--cyan)" : "var(--text-muted)" }}>
+                        {documents.length > 0 ? documents[0].name : "Not uploaded"}
+                      </span>
+                    </div>
                   </div>
                   <div style={{ marginTop: 8, display: "flex", gap: 6, flexWrap: "wrap" }}>
                     <button className="small-button secondary" style={{ fontSize: 10 }} onClick={() => { navigator.clipboard.writeText(profile.email || ""); setNotice("Email copied!"); }}>📋 Copy Email</button>
@@ -2472,7 +2478,7 @@ export default function Home() {
                   <div>
                     <h3 style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>Tailored Cover Letter</h3>
                     <p className="review-cl-note" style={{ margin: "2px 0 0" }}>
-                      Tied specifically to <strong>{reviewingJob.company}</strong> ({reviewingJob.role}). Anchored to your attached base letter and Columbia profile.
+                      Tied specifically to <strong>{reviewingJob.company}</strong> ({reviewingJob.role}). Anchored to your attached base letter and profile.
                     </p>
                   </div>
                   <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
@@ -2875,7 +2881,7 @@ export default function Home() {
                 <div className="how-step-num">2</div>
                 <h4>Attached Base Letter & Profile Anchor</h4>
                 <p>
-                  Your uploaded resume, Columbia profile variables, and <strong>attached base cover letters</strong> establish your authentic voice. The engine extracts real project anecdotes and avoids generic cookie-cutter phrasing.
+                  Your uploaded resume, profile variables, and <strong>attached base cover letters</strong> establish your authentic voice. The engine extracts real project anecdotes and avoids generic cookie-cutter phrasing.
                 </p>
               </div>
 
