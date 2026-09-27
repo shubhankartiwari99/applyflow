@@ -144,27 +144,36 @@ export default function LoginPage() {
       </div>
 
       <footer className="login-footer">
-        <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "center", flexWrap: "wrap", fontSize: "12px" }}>
           <span>
-            <span className="footer-spark">✦</span> StratumApply — Architected by <strong style={{ color: "var(--text-primary)" }}>Shubhankar Tiwari</strong> (Columbia University)
+            <span className="footer-spark">✦</span> StratumApply — Built by <strong style={{ color: "var(--text-primary)" }}>Shubhankar Tiwari</strong> (Columbia University)
           </span>
           <span style={{ opacity: 0.35 }}>•</span>
           <a
-            href="https://github.com/shubhankartiwari99"
+            href="https://shubhankar-tiwari.vercel.app"
             target="_blank"
             rel="noopener noreferrer"
             style={{ color: "var(--accent)", textDecoration: "none", fontWeight: 500 }}
           >
-            GitHub
+            Portfolio
           </a>
           <span style={{ opacity: 0.35 }}>•</span>
           <a
-            href="https://www.linkedin.com/in/shubhankartiwari"
+            href="https://www.linkedin.com/in/shubhankartiw1/"
             target="_blank"
             rel="noopener noreferrer"
             style={{ color: "#00A3FF", textDecoration: "none", fontWeight: 500 }}
           >
             LinkedIn
+          </a>
+          <span style={{ opacity: 0.35 }}>•</span>
+          <a
+            href="https://github.com/shubhankartiwari99"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: "var(--text-muted)", textDecoration: "none", fontWeight: 500 }}
+          >
+            GitHub
           </a>
         </div>
       </footer>
