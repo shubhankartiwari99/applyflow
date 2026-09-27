@@ -272,11 +272,20 @@ export default function Home() {
 
   // AI Studio Playground State
   const [studioTarget, setStudioTarget] = useState({
-    company: "Google", role: "Machine Learning Engineering Intern", tone: "technical",
+    jobId: "",
+    company: "Google",
+    role: "Machine Learning Engineering Intern",
+    tone: "technical" as "technical" | "impact" | "quantitative" | "academic",
+    baseLetterId: "",
+    customBaseText: "",
+    customFocus: "Focus on PyTorch distributed training, model evaluation benchmarks, and low-latency API architecture",
   });
   const [studioResult, setStudioResult] = useState("");
   const [isStudioGenerating, setIsStudioGenerating] = useState(false);
   const [studioSaved, setStudioSaved] = useState(false);
+  const [isArchitectureModalOpen, setIsArchitectureModalOpen] = useState(false);
+  const [reviewTone, setReviewTone] = useState<string>("technical");
+  const [reviewBaseLetterId, setReviewBaseLetterId] = useState<string>("");
 
   // ─── Keydown (Escape) ───
   useEffect(() => {
@@ -540,20 +549,28 @@ export default function Home() {
     setReviewingJob(job);
     setEditedCoverLetter(job.generatedCoverLetter ?? "");
     setCopied(false);
+    setReviewTone("technical");
+    if (coverLetters.length > 0 && !reviewBaseLetterId) {
+      setReviewBaseLetterId(coverLetters[0].id);
+    }
   }
 
-  async function generateCoverLetterForJob(jobId: string) {
+  async function generateCoverLetterForJob(jobId: string, tone?: string, baseId?: string) {
     setIsGeneratingCL(true);
     try {
       const r = await fetch("/api/cover-letters/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jobId }),
+        body: JSON.stringify({
+          jobId,
+          tone: tone ?? reviewTone,
+          baseCoverLetterId: baseId ?? (reviewBaseLetterId || undefined),
+        }),
       });
       const d = await r.json() as { coverLetter?: string; error?: string };
       if (!r.ok) throw new Error(d.error ?? "Generation failed.");
       setEditedCoverLetter(d.coverLetter ?? "");
-      setNotice("AI synthesized a tailored cover letter using your resume and submission corpus!");
+      setNotice("AI synthesized a tailored cover letter customized for this job using your profile and attached base letter!");
     } catch (e) {
       setNotice(e instanceof Error ? e.message : "Cover letter generation failed.");
     } finally {
@@ -675,19 +692,27 @@ export default function Home() {
     setIsStudioGenerating(true);
     setStudioSaved(false);
     try {
+      const selectedJob = jobs.find((j) => j.id === studioTarget.jobId);
+      const company = selectedJob ? selectedJob.company : studioTarget.company;
+      const role = selectedJob ? selectedJob.role : studioTarget.role;
+
       const r = await fetch("/api/cover-letters/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          company: studioTarget.company,
-          role: studioTarget.role,
+          jobId: studioTarget.jobId || undefined,
+          company,
+          role,
           tone: studioTarget.tone,
+          baseCoverLetterId: studioTarget.baseLetterId || undefined,
+          baseCoverLetterText: studioTarget.customBaseText || undefined,
+          customFocus: studioTarget.customFocus || undefined,
         }),
       });
       const d = await r.json() as { coverLetter?: string; error?: string };
       if (!r.ok) throw new Error(d.error ?? "Failed to generate.");
       setStudioResult(d.coverLetter ?? "");
-      setNotice(`Generated tailored cover letter for ${studioTarget.company}!`);
+      setNotice(`Generated tailored cover letter for ${company} (${role}) adapted from your base letter!`);
     } catch (e) {
       setNotice(e instanceof Error ? e.message : "Generation failed.");
     } finally {
@@ -695,17 +720,45 @@ export default function Home() {
     }
   }
 
+  async function applyStudioResultToJob() {
+    if (!studioResult || !studioTarget.jobId) return;
+    try {
+      await fetch(`/api/jobs/${studioTarget.jobId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          generatedCoverLetter: studioResult,
+          status: "ready_for_review",
+        }),
+      });
+      setJobs((c) =>
+        c.map((j) =>
+          j.id === studioTarget.jobId
+            ? { ...j, generatedCoverLetter: studioResult, status: "ready_for_review" as JobStatus }
+            : j
+        )
+      );
+      setNotice(`✓ Tailored cover letter attached directly to job dossier! Application is ready for review.`);
+    } catch {
+      setNotice("Could not attach cover letter to job.");
+    }
+  }
+
   async function saveStudioResultToCorpus() {
     if (!studioResult) return;
     try {
+      const selectedJob = jobs.find((j) => j.id === studioTarget.jobId);
+      const company = selectedJob ? selectedJob.company : studioTarget.company;
+      const role = selectedJob ? selectedJob.role : studioTarget.role;
+
       const r = await fetch("/api/cover-letters", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: `${studioTarget.company} — ${studioTarget.role}`,
+          name: `${company} — ${role}`,
           content: studioResult,
-          companySubmittedTo: studioTarget.company,
-          roleSubmittedTo: studioTarget.role,
+          companySubmittedTo: company,
+          roleSubmittedTo: role,
           isTemplate: false,
         }),
       });
@@ -713,7 +766,7 @@ export default function Home() {
         const d = await r.json() as { coverLetter: CoverLetterItem };
         setCoverLetters((c) => [d.coverLetter, ...c]);
         setStudioSaved(true);
-        setNotice("Saved to your Cover Letter Corpus!");
+        setNotice("Saved tailored cover letter to your corpus!");
       }
     } catch {
       setNotice("Could not save to corpus.");
@@ -983,92 +1036,290 @@ export default function Home() {
     // ══════════════════════════════════════════════════════════════════
     // 3. AI COVER LETTER STUDIO
     // ══════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════
+    // 3. AI COVER LETTER STUDIO (JOB-TIED & PROFILE-ADAPTED)
+    // ══════════════════════════════════════════════════════════════════
     if (activeSection === "studio") {
+      const selectedJob = jobs.find((j) => j.id === studioTarget.jobId);
+      const activeAttachedLetter =
+        coverLetters.find((cl) => cl.id === studioTarget.baseLetterId) ||
+        (coverLetters.length > 0 ? coverLetters[0] : null);
+
+      const wordCount = studioResult ? studioResult.trim().split(/\s+/).filter(Boolean).length : 0;
+      const readingTime = Math.max(1, Math.ceil(wordCount / 200));
+
       return (
         <>
           <section className="subpage-hero">
             <div>
-              <div className="eyebrow"><span className="eyebrow-line" />AI WORKBENCH</div>
+              <div className="eyebrow"><span className="eyebrow-line" />INTELLIGENT SYNTHESIZER</div>
               <h1>AI Cover Letter Studio</h1>
-              <p>Test and preview custom cover letter generation for any target company or role. Powered by your resume and corpus of past submissions.</p>
+              <p>
+                Link any target job from your pipeline or enter one ad-hoc. The AI anchors to your attached base cover letter and Columbia profile to synthesize an authentic, tailored application.
+              </p>
             </div>
-            <button className="small-button secondary" onClick={() => setActiveSection("documents")}>View All Cover Letters</button>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button className="small-button secondary" onClick={() => setIsArchitectureModalOpen(true)}>
+                ⚡ How It Works
+              </button>
+              <button className="small-button secondary" onClick={() => setActiveSection("documents")}>
+                View All Cover Letters
+              </button>
+            </div>
           </section>
 
-          <div className="studio-card">
+          <div className="studio-card" style={{ padding: "24px" }}>
             <div className="studio-header">
-              <h2>Generate Tailored Cover Letter</h2>
-              <span className="source-state" style={{ color: "var(--accent)", background: "var(--accent-muted)" }}>GPT-4o Engine</span>
+              <div>
+                <h2>Target Opportunity & Attached Voice Configuration</h2>
+                <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
+                  Every generated letter adopts your attached voice while targeting specific company engineering requirements.
+                </p>
+              </div>
+              <span className="source-state" style={{ color: "var(--accent)", background: "rgba(0, 229, 153, 0.12)", border: "1px solid rgba(0, 229, 153, 0.3)" }}>
+                ✦ AI Synthesizer Active
+              </span>
             </div>
 
-            <div className="studio-form-grid">
+            {/* Step 1 & 2: Job Selector & Base Cover Letter Reference */}
+            <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 16, marginBottom: 16 }}>
+              {/* Job Selector */}
               <div>
-                <label style={{ display: "block", fontSize: 10, fontFamily: "'JetBrains Mono', monospace", color: "var(--text-muted)", marginBottom: 6 }}>TARGET COMPANY</label>
-                <input
+                <label style={{ display: "block", fontSize: 10, fontFamily: "'JetBrains Mono', monospace", color: "var(--text-muted)", marginBottom: 6 }}>
+                  LINK TO PIPELINE JOB (OR ENTER CUSTOM COMPANY & ROLE)
+                </label>
+                <select
                   className="login-input"
-                  style={{ width: "100%" }}
-                  value={studioTarget.company}
-                  onChange={(e) => setStudioTarget((t) => ({ ...t, company: e.target.value }))}
-                  placeholder="e.g. OpenAI, Google, Jane Street"
-                />
-              </div>
-              <div>
-                <label style={{ display: "block", fontSize: 10, fontFamily: "'JetBrains Mono', monospace", color: "var(--text-muted)", marginBottom: 6 }}>TARGET ROLE</label>
-                <input
-                  className="login-input"
-                  style={{ width: "100%" }}
-                  value={studioTarget.role}
-                  onChange={(e) => setStudioTarget((t) => ({ ...t, role: e.target.value }))}
-                  placeholder="e.g. AI/ML Engineering Intern"
-                />
-              </div>
-              <div>
-                <label style={{ display: "block", fontSize: 10, fontFamily: "'JetBrains Mono', monospace", color: "var(--text-muted)", marginBottom: 6 }}>TONE & STYLE</label>
-                <div className="tone-selector">
-                  {[
-                    { id: "technical", label: "ML & Tech" },
-                    { id: "impact", label: "High Impact" },
-                    { id: "academic", label: "Research" },
-                  ].map((t) => (
-                    <button
-                      key={t.id}
-                      className={`tone-button${studioTarget.tone === t.id ? " active" : ""}`}
-                      onClick={() => setStudioTarget((s) => ({ ...s, tone: t.id }))}
-                    >
-                      {t.label}
-                    </button>
+                  style={{ width: "100%", background: "var(--bg-tertiary)", cursor: "pointer" }}
+                  value={studioTarget.jobId}
+                  onChange={(e) => {
+                    const jId = e.target.value;
+                    const found = jobs.find((j) => j.id === jId);
+                    if (found) {
+                      setStudioTarget((t) => ({ ...t, jobId: found.id, company: found.company, role: found.role }));
+                    } else {
+                      setStudioTarget((t) => ({ ...t, jobId: "" }));
+                    }
+                  }}
+                >
+                  <option value="">-- Custom / Ad-hoc Opportunity --</option>
+                  {jobs.map((j) => (
+                    <option key={j.id} value={j.id}>
+                      {j.company} — {j.role} ({j.fitScore}% match · {j.source})
+                    </option>
                   ))}
+                </select>
+
+                {selectedJob && (
+                  <div style={{ marginTop: 8 }} className="studio-job-badge">
+                    <span>🎯 Active Target:</span>
+                    <strong>{selectedJob.company} — {selectedJob.role}</strong>
+                    <span>· {selectedJob.source}</span>
+                    <span style={{ color: "var(--accent)" }}>{selectedJob.fitScore}% Fit</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Attached Cover Letter Selection */}
+              <div>
+                <label style={{ display: "block", fontSize: 10, fontFamily: "'JetBrains Mono', monospace", color: "var(--cyan)", marginBottom: 6 }}>
+                  📎 ATTACHED BASE COVER LETTER (VOICE & EXPERIENCE FOUNDATION)
+                </label>
+                <select
+                  className="login-input"
+                  style={{ width: "100%", background: "var(--bg-tertiary)", cursor: "pointer" }}
+                  value={studioTarget.baseLetterId}
+                  onChange={(e) => setStudioTarget((t) => ({ ...t, baseLetterId: e.target.value }))}
+                >
+                  <option value="">Default Profile Master Letter</option>
+                  {coverLetters.map((cl) => (
+                    <option key={cl.id} value={cl.id}>
+                      📄 {cl.name} {cl.isTemplate ? "(Master Template)" : `(${cl.companySubmittedTo || "Corpus"})`}
+                    </option>
+                  ))}
+                </select>
+
+                <div className="attached-box" style={{ marginTop: 8 }}>
+                  <div className="attached-box-title">
+                    <span>Active Voice: {activeAttachedLetter?.name || "Master Profile Template"}</span>
+                    <span>{activeAttachedLetter ? `${activeAttachedLetter.content.trim().split(/\s+/).filter(Boolean).length} words` : "Profile Fallback"}</span>
+                  </div>
+                  <div className="attached-box-preview">
+                    &quot;{activeAttachedLetter?.content.slice(0, 140) || profile.coverLetterTemplate.slice(0, 140)}...&quot;
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
+            {/* Custom Company & Role if not selected from job */}
+            {!selectedJob && (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 16 }}>
+                <div>
+                  <label style={{ display: "block", fontSize: 10, fontFamily: "'JetBrains Mono', monospace", color: "var(--text-muted)", marginBottom: 6 }}>TARGET COMPANY</label>
+                  <input
+                    className="login-input"
+                    style={{ width: "100%" }}
+                    value={studioTarget.company}
+                    onChange={(e) => setStudioTarget((t) => ({ ...t, company: e.target.value }))}
+                    placeholder="e.g. OpenAI, Google, Jane Street"
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: 10, fontFamily: "'JetBrains Mono', monospace", color: "var(--text-muted)", marginBottom: 6 }}>TARGET ROLE</label>
+                  <input
+                    className="login-input"
+                    style={{ width: "100%" }}
+                    value={studioTarget.role}
+                    onChange={(e) => setStudioTarget((t) => ({ ...t, role: e.target.value }))}
+                    placeholder="e.g. AI/ML Engineering Intern"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Profile Hook & Custom Focus */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
+              <div style={{ padding: "10px 14px", background: "rgba(255,255,255,0.02)", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-sm)", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+                <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>
+                  <strong style={{ color: "#fff" }}>Candidate Identity Anchor:</strong> {profile.fullName || "Shubhankar Tiwari"} · <span style={{ color: "var(--accent)", fontWeight: 600 }}>Columbia University</span> · {profile.targetRoles || "AI/ML Engineering Intern"}
+                </div>
+                <button className="small-button secondary" onClick={() => setActiveSection("profile")} style={{ fontSize: 10 }}>
+                  Edit Profile Targeting
+                </button>
+              </div>
+
+              <div>
+                <label style={{ display: "block", fontSize: 10, fontFamily: "'JetBrains Mono', monospace", color: "var(--text-muted)", marginBottom: 4 }}>
+                  CUSTOM FOCAL POINT & SKILLS EMPHASIS (AI weaves these into the body paragraphs)
+                </label>
+                <input
+                  className="login-input"
+                  style={{ width: "100%" }}
+                  value={studioTarget.customFocus}
+                  onChange={(e) => setStudioTarget((t) => ({ ...t, customFocus: e.target.value }))}
+                  placeholder="e.g. Highlight PyTorch distributed training, CUDA benchmarks, and Columbia lab research"
+                />
+              </div>
+            </div>
+
+            {/* Strategic Tone Presets */}
+            <div style={{ marginBottom: 18 }}>
+              <label style={{ display: "block", fontSize: 10, fontFamily: "'JetBrains Mono', monospace", color: "var(--text-muted)", marginBottom: 6 }}>
+                STRATEGIC TONE PRESET
+              </label>
+              <div className="tone-selector" style={{ gap: 8 }}>
+                {[
+                  { id: "technical", label: "⚡ Deep Tech & ML", desc: "Architecture, frameworks, CUDA, performance" },
+                  { id: "impact", label: "🚀 Founder & Impact", desc: "0-to-1 execution, fast shipping, metrics" },
+                  { id: "quantitative", label: "📊 Quant & Rigor", desc: "Mathematical grounding, empirical metrics" },
+                  { id: "academic", label: "🎓 Academic & Research", desc: "Columbia lab coursework, novel literature" },
+                ].map((t) => (
+                  <button
+                    key={t.id}
+                    className={`tone-button${studioTarget.tone === t.id ? " active" : ""}`}
+                    onClick={() => setStudioTarget((s) => ({ ...s, tone: t.id as "technical" | "impact" | "quantitative" | "academic" }))}
+                    style={{ padding: "8px 12px", textAlign: "left", flex: 1 }}
+                  >
+                    <div style={{ fontWeight: 700 }}>{t.label}</div>
+                    <div style={{ fontSize: 9, opacity: 0.75, marginTop: 2 }}>{t.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Action Bar */}
+            <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 20 }}>
               <button
                 className="primary-button"
                 onClick={generateStudioCoverLetter}
                 disabled={isStudioGenerating}
-                style={{ padding: "0 18px" }}
+                style={{ padding: "0 22px", height: 42, fontSize: 13 }}
               >
-                {isStudioGenerating ? "Synthesizing with AI…" : "⚡ Generate Tailored Cover Letter"}
+                {isStudioGenerating ? "Synthesizing with AI…" : `⚡ Synthesize Tailored Letter for ${selectedJob ? selectedJob.company : studioTarget.company}`}
               </button>
+              {selectedJob && studioResult && (
+                <button
+                  className="primary-button"
+                  style={{ background: "linear-gradient(135deg, #00D2FF, #00A3FF)", color: "#000", height: 42 }}
+                  onClick={applyStudioResultToJob}
+                >
+                  💾 Apply Directly to {selectedJob.company} Application Dossier
+                </button>
+              )}
             </div>
 
+            {/* Dual Pane Layout for Results */}
             {studioResult && (
-              <div style={{ marginTop: 16 }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>Draft Preview & Editor</span>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button className="small-button secondary" onClick={() => navigator.clipboard.writeText(studioResult)}>📋 Copy</button>
-                    <button className="small-button" onClick={saveStudioResultToCorpus} disabled={studioSaved}>
-                      {studioSaved ? "Saved to Corpus ✓" : "Save to Corpus"}
-                    </button>
+              <div className="studio-dual-grid">
+                {/* Left Pane: Job Context & Voice Reference */}
+                <div className="studio-side-card">
+                  <div className="studio-side-header">
+                    <h3><span>🎯</span> Target Opportunity Context</h3>
+                    <span className="stat-pill active">{selectedJob ? `${selectedJob.fitScore}% Match` : "Ad-hoc"}</span>
                   </div>
+
+                  <div>
+                    <h4 style={{ fontSize: 13, color: "#fff", fontWeight: 700 }}>{selectedJob ? selectedJob.role : studioTarget.role}</h4>
+                    <p style={{ fontSize: 12, color: "var(--text-muted)" }}>{selectedJob ? selectedJob.company : studioTarget.company} · {selectedJob?.location ?? "United States (Hybrid / Remote)"}</p>
+                  </div>
+
+                  {selectedJob?.jobDescription && (
+                    <div>
+                      <span style={{ fontSize: 10, fontFamily: "'JetBrains Mono', monospace", color: "var(--text-muted)" }}>PARSED REQUIREMENTS</span>
+                      <p style={{ fontSize: 11, color: "var(--text-secondary)", lineHeight: 1.5, marginTop: 4, maxHeight: 100, overflowY: "auto" }}>
+                        {selectedJob.jobDescription}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="attached-box">
+                    <div className="attached-box-title">
+                      <span>Inspiration: {activeAttachedLetter?.name || "Master Letter"}</span>
+                    </div>
+                    <p style={{ fontSize: 10, color: "var(--text-secondary)", margin: "4px 0 0" }}>
+                      AI preserved your authentic accomplishments, projects, and personal voice from this attached document.
+                    </p>
+                  </div>
+
+                  {selectedJob?.applyUrl && (
+                    <a
+                      href={selectedJob.applyUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="outline-button"
+                      style={{ textAlign: "center", textDecoration: "none", fontSize: 11, padding: "8px 12px" }}
+                    >
+                      Open {selectedJob.company} Portal ↗
+                    </a>
+                  )}
                 </div>
-                <textarea
-                  className="studio-editor"
-                  value={studioResult}
-                  onChange={(e) => setStudioResult(e.target.value)}
-                />
+
+                {/* Right Pane: Live Synthesized Editor */}
+                <div className="studio-side-card" style={{ border: "1px solid rgba(0, 229, 153, 0.3)" }}>
+                  <div className="studio-side-header">
+                    <div className="stats-badge-row">
+                      <span className="stat-pill active">✓ Tailored to {selectedJob ? selectedJob.company : studioTarget.company}</span>
+                      <span className="stat-pill">{wordCount} words</span>
+                      <span className="stat-pill">~{readingTime} min read</span>
+                      <span className="stat-pill" style={{ textTransform: "capitalize" }}>Tone: {studioTarget.tone}</span>
+                    </div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button className="small-button secondary" onClick={() => navigator.clipboard.writeText(studioResult)}>
+                        📋 Copy
+                      </button>
+                      <button className="small-button" onClick={saveStudioResultToCorpus} disabled={studioSaved}>
+                        {studioSaved ? "Saved to Corpus ✓" : "Save to Corpus"}
+                      </button>
+                    </div>
+                  </div>
+
+                  <textarea
+                    className="studio-editor"
+                    style={{ minHeight: 380, lineHeight: 1.7 }}
+                    value={studioResult}
+                    onChange={(e) => setStudioResult(e.target.value)}
+                  />
+                </div>
               </div>
             )}
           </div>
@@ -1667,6 +1918,13 @@ export default function Home() {
             StratumApply <i>›</i> <strong>{activeSection === "overview" ? "Mission Control" : activeSection[0].toUpperCase() + activeSection.slice(1)}</strong>
           </div>
           <div className="topbar-actions">
+            <button
+              className="small-button secondary"
+              style={{ fontSize: 11, padding: "4px 10px", borderColor: "rgba(0, 229, 153, 0.35)", color: "var(--accent)" }}
+              onClick={() => setIsArchitectureModalOpen(true)}
+            >
+              ⚡ How StratumApply Works
+            </button>
             <div className="sync-status"><span className="live-dot" />Database Synced</div>
             <button className="icon-button"><Icon name="bell" /><span className="notification-dot" /></button>
             <div className="top-avatar">{displayInitials}</div>
@@ -1791,28 +2049,74 @@ export default function Home() {
                 <div className="review-section-header">
                   <div>
                     <h3 style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>Tailored Cover Letter</h3>
-                    <p className="review-cl-note" style={{ margin: "2px 0 0" }}>Synthesized from your resume and submission corpus. Edit freely before approving.</p>
+                    <p className="review-cl-note" style={{ margin: "2px 0 0" }}>
+                      Tied specifically to <strong>{reviewingJob.company}</strong> ({reviewingJob.role}). Anchored to your attached base letter and Columbia profile.
+                    </p>
                   </div>
-                  <div style={{ display: "flex", gap: 6 }}>
-                    <button
-                      className="review-copy-btn"
-                      onClick={() => generateCoverLetterForJob(reviewingJob.id)}
-                      disabled={isGeneratingCL}
-                    >
-                      {isGeneratingCL ? "Synthesizing…" : "⚡ Regenerate with AI"}
-                    </button>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    <span className="stat-pill active">
+                      {editedCoverLetter ? `${editedCoverLetter.trim().split(/\s+/).filter(Boolean).length} words` : "Empty"}
+                    </span>
                     <button className={`review-copy-btn${copied ? " copied" : ""}`} onClick={copyCoverLetter}>
                       <Icon name="copy" /> {copied ? "Copied!" : "Copy"}
                     </button>
                   </div>
                 </div>
 
+                {/* Tone & Attached Base Voice Selection */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: "10px 12px", background: "var(--bg-tertiary)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-subtle)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <div style={{ fontSize: 11, color: "var(--text-muted)", display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ color: "var(--cyan)", fontWeight: 700 }}>📎 BASE VOICE:</span>
+                      <select
+                        style={{ background: "transparent", color: "#fff", border: "1px solid var(--border-default)", borderRadius: 4, padding: "2px 6px", fontSize: 11, cursor: "pointer", outline: "none" }}
+                        value={reviewBaseLetterId}
+                        onChange={(e) => setReviewBaseLetterId(e.target.value)}
+                      >
+                        <option value="" style={{ background: "#111622", color: "#fff" }}>Master Profile Template</option>
+                        {coverLetters.map((cl) => (
+                          <option key={cl.id} value={cl.id} style={{ background: "#111622", color: "#fff" }}>
+                            {cl.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="tone-selector" style={{ margin: 0 }}>
+                      {[
+                        { id: "technical", label: "Tech & ML" },
+                        { id: "impact", label: "Impact" },
+                        { id: "quantitative", label: "Quant" },
+                        { id: "academic", label: "Research" },
+                      ].map((t) => (
+                        <button
+                          key={t.id}
+                          className={`tone-button${reviewTone === t.id ? " active" : ""}`}
+                          onClick={() => setReviewTone(t.id)}
+                          style={{ padding: "3px 8px", fontSize: 10 }}
+                        >
+                          {t.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <button
+                    className="primary-button"
+                    style={{ width: "100%", height: 32, fontSize: 11 }}
+                    onClick={() => generateCoverLetterForJob(reviewingJob.id, reviewTone, reviewBaseLetterId)}
+                    disabled={isGeneratingCL}
+                  >
+                    {isGeneratingCL ? "Synthesizing with AI…" : `⚡ Regenerate Tailored Cover Letter for ${reviewingJob.company}`}
+                  </button>
+                </div>
+
                 <textarea
                   className="review-cover-editor"
-                  style={{ minHeight: 340 }}
+                  style={{ minHeight: 310, lineHeight: 1.65 }}
                   value={editedCoverLetter}
                   onChange={(e) => setEditedCoverLetter(e.target.value)}
-                  placeholder="Click 'Regenerate with AI' or paste your cover letter here..."
+                  placeholder="Click 'Regenerate Tailored Cover Letter' or paste your customized letter here..."
                 />
               </div>
             </div>
@@ -1902,6 +2206,80 @@ export default function Home() {
                 <button type="submit" className="primary-button">Add to Learning Corpus</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── INTERACTIVE SYSTEM ARCHITECTURE & WORKFLOW MODAL ── */}
+      {isArchitectureModalOpen && (
+        <div className="how-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setIsArchitectureModalOpen(false); }}>
+          <div className="how-modal">
+            <div className="how-header">
+              <div>
+                <div className="eyebrow"><span className="eyebrow-line" />SYSTEM ARCHITECTURE & LIFECYCLE</div>
+                <h2 style={{ fontSize: 20, fontWeight: 800, color: "#fff" }}>⚡ How StratumApply Works</h2>
+                <p style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 4 }}>
+                  Autonomous multi-portal job application pipeline with strict human-in-the-loop review.
+                </p>
+              </div>
+              <button className="review-close" onClick={() => setIsArchitectureModalOpen(false)}><Icon name="close" /></button>
+            </div>
+
+            <div className="how-step-grid">
+              <div className="how-step-card">
+                <div className="how-step-num">1</div>
+                <h4>Multi-Portal Discovery</h4>
+                <p>
+                  Connects to <strong>Handshake</strong> (Columbia Engineering), <strong>GoinGlobal</strong>, <strong>LinkedIn</strong>, <strong>Greenhouse</strong>, <strong>Lever</strong>, and <strong>Workday</strong>. Automatically pulls job descriptions, tags, and evaluates 0–100 candidate fit.
+                </p>
+              </div>
+
+              <div className="how-step-card">
+                <div className="how-step-num">2</div>
+                <h4>Attached Base Letter & Profile Anchor</h4>
+                <p>
+                  Your uploaded resume, Columbia profile variables, and <strong>attached base cover letters</strong> establish your authentic voice. The engine extracts real project anecdotes and avoids generic cookie-cutter phrasing.
+                </p>
+              </div>
+
+              <div className="how-step-card">
+                <div className="how-step-num">3</div>
+                <h4>AI Contextual Synthesis</h4>
+                <p>
+                  Ties the target job description directly to your profile. Select from 4 strategic styles: <strong>Deep Tech & ML</strong>, <strong>Founder Impact</strong>, <strong>Quant Rigor</strong>, or <strong>Academic Research</strong> with custom focal points.
+                </p>
+              </div>
+
+              <div className="how-step-card">
+                <div className="how-step-num">4</div>
+                <h4>Human-in-the-Loop Review Gate</h4>
+                <p>
+                  Zero accidental submissions. StratumApply prepares the complete dossier, pre-fills applicant data, and halts at an interactive review screen for your final stamp of approval.
+                </p>
+              </div>
+
+              <div className="how-step-card">
+                <div className="how-step-num">5</div>
+                <h4>Direct Submission & Tracking</h4>
+                <p>
+                  Launch directly into the target company ATS with pre-filled fields and 1-click clipboard transfer. Submissions are saved to your private database and added to your AI learning corpus.
+                </p>
+              </div>
+            </div>
+
+            <div style={{ padding: "16px 20px", background: "rgba(0, 229, 153, 0.08)", border: "1px solid rgba(0, 229, 153, 0.25)", borderRadius: "var(--radius-md)", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+              <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+                <strong style={{ color: "#fff" }}>Ready to apply?</strong> Pick any role in your queue or test tailored synthesis in the AI Studio.
+              </div>
+              <div style={{ display: "flex", gap: 10 }}>
+                <button className="small-button secondary" onClick={() => { setIsArchitectureModalOpen(false); setActiveSection("studio"); }}>
+                  Open AI Studio
+                </button>
+                <button className="primary-button" onClick={() => { setIsArchitectureModalOpen(false); setActiveSection("overview"); }}>
+                  Go to Mission Control
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

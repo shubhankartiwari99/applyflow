@@ -65,6 +65,8 @@ export async function prepareJob(
       resumeText: resumeText || profileSummary,
       coverLetterContext: coverLetterCtx,
       profileSummary,
+      baseCoverLetter: profile.coverLetterTemplate || undefined,
+      tone: "technical",
     });
 
     // Save the generated cover letter to the job

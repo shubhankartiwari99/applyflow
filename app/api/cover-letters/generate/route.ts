@@ -21,12 +21,21 @@ export async function POST(request: Request) {
   if (!userId) return NextResponse.json({ error: "Sign in is required." }, { status: 401 });
 
   try {
-    const body = (await request.json()) as { jobId?: string; company?: string; role?: string };
+    const body = (await request.json()) as {
+      jobId?: string;
+      company?: string;
+      role?: string;
+      jobDescription?: string;
+      baseCoverLetterId?: string;
+      baseCoverLetterText?: string;
+      tone?: "technical" | "impact" | "quantitative" | "academic" | "standard";
+      customFocus?: string;
+    };
 
     // Get the target job (or create an ad-hoc request)
     let company = body.company ?? "";
     let role = body.role ?? "";
-    let jobDescription: string | null = null;
+    let jobDescription: string | null = body.jobDescription ?? null;
     let jobId: string | null = body.jobId ?? null;
 
     if (jobId) {
@@ -56,6 +65,17 @@ export async function POST(request: Request) {
       `Work authorization: ${profile?.workAuthorization || "Not specified"}`,
     ].join("\n");
 
+    // Resolve attached/base cover letter
+    let baseCoverLetter: string | undefined = body.baseCoverLetterText;
+    if (!baseCoverLetter && body.baseCoverLetterId) {
+      const { getCoverLetter } = await import("../../../../lib/cover-letters");
+      const found = await getCoverLetter(userId, body.baseCoverLetterId);
+      if (found) baseCoverLetter = found.content;
+    }
+    if (!baseCoverLetter && profile?.coverLetterTemplate && profile.coverLetterTemplate.trim().length > 60) {
+      baseCoverLetter = profile.coverLetterTemplate;
+    }
+
     // Generate
     const result = await generateCoverLetter({
       company,
@@ -64,6 +84,9 @@ export async function POST(request: Request) {
       resumeText: resumeText || profileSummary,
       coverLetterContext: coverLetterCtx,
       profileSummary,
+      baseCoverLetter,
+      tone: body.tone ?? "technical",
+      customFocus: body.customFocus,
     });
 
     // Save to the job if we have one
