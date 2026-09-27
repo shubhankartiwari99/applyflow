@@ -11,10 +11,12 @@
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
+    "mammoth": "^1.13.0",
     "next": "^15.5.4",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
-    "resend": "^6.28.1"
+    "resend": "^6.28.1",
+    "unpdf": "^1.8.1"
   },
   "devDependencies": {
     "@types/node": "^22.15.24",

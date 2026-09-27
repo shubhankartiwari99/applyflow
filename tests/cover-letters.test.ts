@@ -15,7 +15,7 @@ describe("cover letters intelligence & data layer", () => {
 
   it("creates, retrieves, and updates a cover letter template", async () => {
     const created = await createCoverLetter(userId, {
-      name: "Columbia AI Master Template",
+      name: "Columbia AI Default Template",
       content: "I am a graduate student at Columbia University studying Machine Learning...",
       isTemplate: true,
     });
@@ -25,10 +25,10 @@ describe("cover letters intelligence & data layer", () => {
     expect(created.isTemplate).toBe(true);
 
     const fetched = await getCoverLetter(userId, created.id);
-    expect(fetched?.name).toBe("Columbia AI Master Template");
+    expect(fetched?.name).toBe("Columbia AI Default Template");
 
     const updated = await updateCoverLetter(userId, created.id, {
-      content: "Updated master cover letter with focus on Deep Learning and LLM fine-tuning.",
+      content: "Updated default cover letter with focus on Deep Learning and LLM fine-tuning.",
     });
     expect(updated?.content).toContain("Deep Learning");
   });

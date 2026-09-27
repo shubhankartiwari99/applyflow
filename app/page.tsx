@@ -269,6 +269,8 @@ export default function Home() {
   const [newCLForm, setNewCLForm] = useState({
     name: "", companySubmittedTo: "", roleSubmittedTo: "", content: "", isTemplate: true,
   });
+  const [isExtractingCL, setIsExtractingCL] = useState(false);
+  const [modalExtractedNotice, setModalExtractedNotice] = useState("");
 
   // AI Studio Playground State
   const [studioTarget, setStudioTarget] = useState({
@@ -691,6 +693,79 @@ export default function Home() {
     setNotice("Cover letter removed from corpus.");
   }
 
+  async function handleBulkCoverLetterUpload(event: ChangeEvent<HTMLInputElement>) {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+    setIsExtractingCL(true);
+    setNotice(`Extracting text and details from ${files.length} cover letter file(s)...`);
+    try {
+      const formData = new FormData();
+      for (let i = 0; i < files.length; i++) {
+        formData.append("files", files[i]);
+      }
+      const r = await fetch("/api/cover-letters/upload", {
+        method: "POST",
+        body: formData,
+      });
+      if (r.ok) {
+        const d = (await r.json()) as { success: boolean; count: number; coverLetters: CoverLetterItem[] };
+        if (d.coverLetters && d.coverLetters.length > 0) {
+          setCoverLetters((c) => [...d.coverLetters, ...c]);
+          setNotice(`✓ Extracted and added ${d.count} cover letter(s) to your learning corpus!`);
+        }
+      } else {
+        const err = (await r.json().catch(() => ({}))) as { error?: string };
+        setNotice(err.error || "Failed to process uploaded cover letters.");
+      }
+    } catch {
+      setNotice("Upload failed. Please ensure files are valid PDF, DOCX, or TXT.");
+    } finally {
+      setIsExtractingCL(false);
+      event.target.value = "";
+    }
+  }
+
+  async function handleModalCoverLetterUpload(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setModalExtractedNotice(`Extracting information from "${file.name}"...`);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("preview", "true");
+      const r = await fetch("/api/cover-letters/upload", {
+        method: "POST",
+        body: formData,
+      });
+      if (r.ok) {
+        const d = (await r.json()) as {
+          preview: boolean;
+          name?: string;
+          company?: string;
+          role?: string;
+          content?: string;
+          isTemplate?: boolean;
+          wordCount?: number;
+        };
+        if (d.content) {
+          setNewCLForm({
+            name: d.name || file.name.replace(/\.[^/.]+$/, ""),
+            companySubmittedTo: d.company || "",
+            roleSubmittedTo: d.role || "",
+            content: d.content,
+            isTemplate: d.isTemplate ?? true,
+          });
+          setModalExtractedNotice(`✓ Extracted ${d.wordCount ?? 0} words from "${file.name}"! Metadata populated.`);
+        }
+      } else {
+        setModalExtractedNotice("Could not extract text from this file. You can paste text manually.");
+      }
+    } catch {
+      setModalExtractedNotice("Extraction failed. Try another format or paste manually.");
+    }
+    event.target.value = "";
+  }
+
   // ─── Actions: AI Studio Generator ───
   async function generateStudioCoverLetter() {
     setIsStudioGenerating(true);
@@ -934,8 +1009,12 @@ export default function Home() {
               <h1>Application Kit & Cover Letter Corpus</h1>
               <p>Upload your resume and all your previous cover letters. StratumApply builds an AI style profile from your submitted letters so every newly synthesized letter mirrors your voice.</p>
             </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button className="text-button" onClick={() => setIsNewCLModalOpen(true)}>＋ Add Cover Letter to Corpus</button>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <label className="upload-button" style={{ background: "rgba(0, 229, 153, 0.15)", color: "var(--accent)", border: "1px solid rgba(0, 229, 153, 0.4)", cursor: "pointer" }}>
+                <span>📤</span>{isExtractingCL ? "Extracting Letters…" : "Upload Cover Letter(s)"}
+                <input type="file" accept=".pdf,.doc,.docx,.txt,.md" multiple onChange={handleBulkCoverLetterUpload} disabled={isExtractingCL} style={{ display: "none" }} />
+              </label>
+              <button className="text-button" onClick={() => { setModalExtractedNotice(""); setIsNewCLModalOpen(true); }}>＋ Add / Review Manually</button>
               <label className="upload-button">
                 <span>＋</span>Upload Resume/Doc
                 <input type="file" accept=".pdf,.doc,.docx,.txt,.md" onChange={addDocument} />
@@ -976,16 +1055,32 @@ export default function Home() {
               <div className="subpage-section-heading" style={{ marginTop: 32 }}>
                 <div>
                   <h2>Cover Letter Corpus ({coverLetters.length})</h2>
-                  <p>Past submitted letters & reusable templates that the AI learns from.</p>
+                  <p>Upload or attach cover letters you&apos;ve written. StratumApply extracts your genuine tone, accomplishments, and voice.</p>
                 </div>
-                <button className="small-button secondary" onClick={() => setActiveSection("studio")}>⚡ Open AI Studio</button>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <label className="small-button secondary" style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 5, color: "var(--accent)", borderColor: "rgba(0, 229, 153, 0.3)" }}>
+                    <span>📤</span> {isExtractingCL ? "Extracting…" : "Upload File(s)"}
+                    <input type="file" accept=".pdf,.doc,.docx,.txt,.md" multiple onChange={handleBulkCoverLetterUpload} disabled={isExtractingCL} style={{ display: "none" }} />
+                  </label>
+                  <button className="small-button secondary" onClick={() => { setModalExtractedNotice(""); setIsNewCLModalOpen(true); }}>＋ Add Manually</button>
+                  <button className="small-button secondary" onClick={() => setActiveSection("studio")}>⚡ Open AI Studio</button>
+                </div>
               </div>
 
               {coverLetters.length === 0 ? (
-                <div className="empty-state">
-                  <div>✍</div>
+                <div className="empty-state" style={{ padding: "36px 20px" }}>
+                  <div style={{ fontSize: 32, marginBottom: 8 }}>📤</div>
                   <strong>No cover letters in corpus</strong>
-                  <span>Click &quot;Add Cover Letter to Corpus&quot; to provide letters you&apos;ve submitted before. The AI will learn your phrasing and style!</span>
+                  <span style={{ maxWidth: 460, margin: "6px auto 14px", display: "block" }}>
+                    Upload your past cover letters (.pdf, .docx, .txt). StratumApply automatically extracts the text, company, and role, teaching the AI your authentic writing voice!
+                  </span>
+                  <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+                    <label className="primary-button" style={{ cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                      <span>📤 Upload Cover Letter(s)</span>
+                      <input type="file" accept=".pdf,.doc,.docx,.txt,.md" multiple onChange={handleBulkCoverLetterUpload} disabled={isExtractingCL} style={{ display: "none" }} />
+                    </label>
+                    <button className="small-button secondary" onClick={() => { setModalExtractedNotice(""); setIsNewCLModalOpen(true); }}>＋ Add / Paste Manually</button>
+                  </div>
                 </div>
               ) : (
                 <div className="corpus-grid" style={{ marginTop: 12 }}>
@@ -994,7 +1089,7 @@ export default function Home() {
                       <div className="corpus-card-header">
                         <div className="corpus-card-title">{cl.name}</div>
                         <span className={`corpus-badge ${cl.isTemplate ? "template" : "submitted"}`}>
-                          {cl.isTemplate ? "Template" : "Submitted"}
+                          {cl.isTemplate ? "Default Template" : "Submitted"}
                         </span>
                       </div>
                       <div className="corpus-meta">
@@ -1154,18 +1249,18 @@ export default function Home() {
                   value={studioTarget.baseLetterId}
                   onChange={(e) => setStudioTarget((t) => ({ ...t, baseLetterId: e.target.value }))}
                 >
-                  <option value="">Default Profile Master Letter</option>
+                  <option value="">Default Cover Letter</option>
                   {coverLetters.map((cl) => (
                     <option key={cl.id} value={cl.id}>
-                      📄 {cl.name} {cl.isTemplate ? "(Master Template)" : `(${cl.companySubmittedTo || "Corpus"})`}
+                      📄 {cl.name} {cl.isTemplate ? "(Default Template)" : `(${cl.companySubmittedTo || "Corpus"})`}
                     </option>
                   ))}
                 </select>
 
                 <div className="attached-box" style={{ marginTop: 8 }}>
                   <div className="attached-box-title">
-                    <span>Active Voice: {activeAttachedLetter?.name || "Master Profile Template"}</span>
-                    <span>{activeAttachedLetter ? `${activeAttachedLetter.content.trim().split(/\s+/).filter(Boolean).length} words` : "Profile Fallback"}</span>
+                    <span>Active Voice: {activeAttachedLetter?.name || "Default Cover Letter"}</span>
+                    <span>{activeAttachedLetter ? `${activeAttachedLetter.content.trim().split(/\s+/).filter(Boolean).length} words` : "Profile Baseline"}</span>
                   </div>
                   <div className="attached-box-preview">
                     &quot;{activeAttachedLetter?.content.slice(0, 140) || profile.coverLetterTemplate.slice(0, 140)}...&quot;
@@ -1297,7 +1392,7 @@ export default function Home() {
 
                   <div className="attached-box">
                     <div className="attached-box-title">
-                      <span>Inspiration: {activeAttachedLetter?.name || "Master Letter"}</span>
+                      <span>Inspiration: {activeAttachedLetter?.name || "Default Cover Letter"}</span>
                     </div>
                     <p style={{ fontSize: 10, color: "var(--text-secondary)", margin: "4px 0 0" }}>
                       AI preserved your authentic accomplishments, projects, and personal voice from this attached document.
@@ -1522,10 +1617,15 @@ export default function Home() {
             </div>
 
             <div className="form-card">
-              <div className="subpage-section-heading"><h2>Master Cover Letter Fallback Template</h2></div>
+              <div className="subpage-section-heading">
+                <h2>Default Cover Letter (Baseline Profile Template)</h2>
+                <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "4px 0 0" }}>
+                  Your primary default letter used as the voice baseline when synthesizing letters for newly discovered internships.
+                </p>
+              </div>
               <div className="form-grid">
                 <label className="wide-field">
-                  TEMPLATE CONTENT (Variables: {"{COMPANY}"}, {"{ROLE}"}, {"{NAME}"})
+                  DEFAULT TEMPLATE CONTENT (Variables: {"{COMPANY}"}, {"{ROLE}"}, {"{NAME}"})
                   <textarea className="cover-letter-textarea" value={profile.coverLetterTemplate} onChange={(e) => setProfile((p) => ({ ...p, coverLetterTemplate: e.target.value }))} />
                 </label>
               </div>
@@ -2069,7 +2169,7 @@ export default function Home() {
                         value={reviewBaseLetterId}
                         onChange={(e) => setReviewBaseLetterId(e.target.value)}
                       >
-                        <option value="" style={{ background: "#111622", color: "#fff" }}>Master Profile Template</option>
+                        <option value="" style={{ background: "#111622", color: "#fff" }}>Default Profile Letter</option>
                         {coverLetters.map((cl) => (
                           <option key={cl.id} value={cl.id} style={{ background: "#111622", color: "#fff" }}>
                             {cl.name}
@@ -2170,19 +2270,53 @@ export default function Home() {
               <div>
                 <h2>Add Cover Letter to AI Corpus</h2>
                 <p style={{ color: "var(--text-tertiary)", fontSize: 12, marginTop: 4 }}>
-                  Provide cover letters you&apos;ve previously submitted. The AI analyzes your writing style and accomplishments to curate new letters accordingly.
+                  Upload previous letters or paste text. The AI extracts your genuine style, company, and projects to curate new applications.
                 </p>
               </div>
               <button className="review-close" onClick={() => setIsNewCLModalOpen(false)}><Icon name="close" /></button>
             </div>
             <form className="review-body" onSubmit={handleAddCoverLetter}>
+              {/* Upload Dropzone */}
+              <div style={{
+                marginBottom: 16,
+                padding: "16px 20px",
+                border: "2px dashed rgba(0, 229, 153, 0.35)",
+                borderRadius: 8,
+                background: "rgba(0, 229, 153, 0.04)",
+                textAlign: "center",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 6,
+              }}>
+                <span style={{ fontSize: 26 }}>📄</span>
+                <strong style={{ fontSize: 13, color: "#fff" }}>Upload Cover Letter File (.pdf, .docx, .txt, .md)</strong>
+                <span style={{ fontSize: 11, color: "var(--text-muted)", maxWidth: 440 }}>
+                  Select or drop a file to automatically extract the text, company name, and role so you don&apos;t have to type anything.
+                </span>
+                <label className="small-button secondary" style={{ marginTop: 6, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, color: "var(--accent)" }}>
+                  <span>📂 Choose File to Auto-Extract</span>
+                  <input
+                    type="file"
+                    accept=".pdf,.doc,.docx,.txt,.md"
+                    style={{ display: "none" }}
+                    onChange={handleModalCoverLetterUpload}
+                  />
+                </label>
+                {modalExtractedNotice && (
+                  <div style={{ fontSize: 12, color: "var(--accent)", marginTop: 4, fontWeight: 600 }}>
+                    {modalExtractedNotice}
+                  </div>
+                )}
+              </div>
+
               <div className="custom-modal-grid">
                 <label>IDENTIFIER / TITLE<input value={newCLForm.name} onChange={(e) => setNewCLForm((f) => ({ ...f, name: e.target.value }))} placeholder="e.g. Google ML Intern 2024" required /></label>
                 <label>COMPANY SUBMITTED TO<input value={newCLForm.companySubmittedTo} onChange={(e) => setNewCLForm((f) => ({ ...f, companySubmittedTo: e.target.value }))} placeholder="e.g. Google" /></label>
                 <label>ROLE SUBMITTED TO<input value={newCLForm.roleSubmittedTo} onChange={(e) => setNewCLForm((f) => ({ ...f, roleSubmittedTo: e.target.value }))} placeholder="e.g. Software Engineering Intern" /></label>
                 <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginTop: 20 }}>
                   <input type="checkbox" checked={newCLForm.isTemplate} onChange={(e) => setNewCLForm((f) => ({ ...f, isTemplate: e.target.checked }))} />
-                  <span>Mark as reusable template</span>
+                  <span>Set as Default Cover Letter</span>
                 </label>
               </div>
               <div style={{ marginTop: 14 }}>
@@ -2192,7 +2326,7 @@ export default function Home() {
                   style={{ minHeight: 220 }}
                   value={newCLForm.content}
                   onChange={(e) => setNewCLForm((f) => ({ ...f, content: e.target.value }))}
-                  placeholder="Paste your past cover letter text here..."
+                  placeholder="Upload a file above or paste your past cover letter text here..."
                   required
                 />
               </div>
@@ -2316,7 +2450,7 @@ export default function Home() {
                   <button className="small-button secondary" onClick={() => { navigator.clipboard.writeText(profile.fullName || "Shubhankar Tiwari"); setNotice("Copied Full Name to clipboard!"); }} style={{ fontSize: 10, padding: "2px 8px" }}>
                     📋 Copy Name
                   </button>
-                  <button className="small-button secondary" onClick={() => { navigator.clipboard.writeText(profile.coverLetterTemplate); setNotice("Copied Master Cover Letter to clipboard!"); }} style={{ fontSize: 10, padding: "2px 8px" }}>
+                  <button className="small-button secondary" onClick={() => { navigator.clipboard.writeText(profile.coverLetterTemplate); setNotice("Copied Default Cover Letter to clipboard!"); }} style={{ fontSize: 10, padding: "2px 8px" }}>
                     📋 Copy Cover Letter
                   </button>
                 </div>
