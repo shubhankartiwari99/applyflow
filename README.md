@@ -160,8 +160,8 @@ StratumApply is architected for zero-configuration deployment to [Vercel](https:
 **Shubhankar Tiwari**  
 *Columbia University*
 
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-shubhankartiwari-0A66C2?style=flat-square&logo=linkedin)](https://www.linkedin.com/in/shubhankartiwari)
 [![GitHub](https://img.shields.io/badge/GitHub-shubhankartiwari99-181717?style=flat-square&logo=github)](https://github.com/shubhankartiwari99)
-[![Repository](https://img.shields.io/badge/Repository-stratumapply-00E599?style=flat-square&logo=git)](https://github.com/shubhankartiwari99/stratumapply)
 [![Email](https://img.shields.io/badge/Email-st3907%40columbia.edu-blue?style=flat-square&logo=gmail)](mailto:st3907@columbia.edu)
 
 Designed and engineered at Columbia University to automate multi-portal internship tracking, AI-augmented cover letter synthesis, and human-verified ATS submission pipelines across Handshake, LinkedIn, Greenhouse, and Lever.

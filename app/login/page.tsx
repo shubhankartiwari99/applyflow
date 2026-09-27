@@ -144,18 +144,29 @@ export default function LoginPage() {
       </div>
 
       <footer className="login-footer">
-        <span>
-          <span className="footer-spark">✦</span> StratumApply — Architected by{" "}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
+          <span>
+            <span className="footer-spark">✦</span> StratumApply — Architected by <strong style={{ color: "var(--text-primary)" }}>Shubhankar Tiwari</strong> (Columbia University)
+          </span>
+          <span style={{ opacity: 0.35 }}>•</span>
           <a
             href="https://github.com/shubhankartiwari99"
             target="_blank"
             rel="noopener noreferrer"
-            style={{ color: "var(--accent)", textDecoration: "none", fontWeight: 600 }}
+            style={{ color: "var(--accent)", textDecoration: "none", fontWeight: 500 }}
           >
-            Shubhankar Tiwari
-          </a>{" "}
-          · Columbia University
-        </span>
+            GitHub
+          </a>
+          <span style={{ opacity: 0.35 }}>•</span>
+          <a
+            href="https://www.linkedin.com/in/shubhankartiwari"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: "#00A3FF", textDecoration: "none", fontWeight: 500 }}
+          >
+            LinkedIn
+          </a>
+        </div>
       </footer>
     </main>
   );

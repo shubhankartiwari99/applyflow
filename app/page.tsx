@@ -1555,14 +1555,14 @@ export default function Home() {
                 <p style={{ margin: "6px 0 12px 0", fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>
                   Engineered at Columbia University to provide an intelligent, human-in-the-loop command center for internship discovery, contextual AI cover letter generation, and verified submissions across Handshake, LinkedIn, Greenhouse, and Lever.
                 </p>
-                <div style={{ display: "flex", gap: 18, fontSize: 12, flexWrap: "wrap" }}>
-                  <a href="https://github.com/shubhankartiwari99/stratumapply" target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)", textDecoration: "none", fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}>
-                    <span>📂</span> GitHub Repository ↗
+                <div style={{ display: "flex", gap: 18, fontSize: 12, flexWrap: "wrap", marginTop: 4 }}>
+                  <a href="https://github.com/shubhankartiwari99" target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)", textDecoration: "none", fontWeight: 600, display: "flex", alignItems: "center", gap: 5 }}>
+                    <span>💻</span> GitHub
                   </a>
-                  <a href="https://github.com/shubhankartiwari99" target="_blank" rel="noopener noreferrer" style={{ color: "#fff", textDecoration: "none", display: "flex", alignItems: "center", gap: 4 }}>
-                    <span>👤</span> @shubhankartiwari99
+                  <a href="https://www.linkedin.com/in/shubhankartiwari" target="_blank" rel="noopener noreferrer" style={{ color: "#00A3FF", textDecoration: "none", fontWeight: 600, display: "flex", alignItems: "center", gap: 5 }}>
+                    <span>🔗</span> LinkedIn
                   </a>
-                  <a href="mailto:st3907@columbia.edu" style={{ color: "var(--text-muted)", textDecoration: "none", display: "flex", alignItems: "center", gap: 4 }}>
+                  <a href="mailto:st3907@columbia.edu" style={{ color: "var(--text-muted)", textDecoration: "none", display: "flex", alignItems: "center", gap: 5 }}>
                     <span>✉️</span> st3907@columbia.edu
                   </a>
                 </div>
@@ -1928,8 +1928,12 @@ export default function Home() {
             <span>Client-controlled browser session. Your data stays in your personal workspace.</span>
           </div>
           <div style={{ padding: "8px 12px", marginTop: "8px", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "11px", color: "var(--text-muted)" }}>
-            <span>Architected by <a href="https://github.com/shubhankartiwari99" target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)", textDecoration: "none", fontWeight: 600 }}>Shubhankar</a></span>
-            <span style={{ fontSize: "10px", background: "rgba(0, 229, 153, 0.12)", color: "var(--accent)", padding: "1px 6px", borderRadius: "4px" }}>Columbia</span>
+            <span>Architected by <strong style={{ color: "var(--text-primary)" }}>Shubhankar</strong></span>
+            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              <a href="https://github.com/shubhankartiwari99" target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)", textDecoration: "none", fontWeight: 600 }} title="GitHub">GitHub</a>
+              <span style={{ opacity: 0.3 }}>·</span>
+              <a href="https://www.linkedin.com/in/shubhankartiwari" target="_blank" rel="noopener noreferrer" style={{ color: "#00A3FF", textDecoration: "none", fontWeight: 600 }} title="LinkedIn">LinkedIn</a>
+            </div>
           </div>
         </div>
       </aside>
@@ -1959,25 +1963,24 @@ export default function Home() {
 
           <footer className="page-footer">
             <span>
-              <span className="footer-spark">✦</span> StratumApply v2 · Created by{" "}
+              <span className="footer-spark">✦</span> StratumApply v2 · Created by <strong style={{ color: "var(--text-primary)" }}>Shubhankar Tiwari</strong> (Columbia University)
+            </span>
+            <div style={{ display: "flex", gap: "14px", alignItems: "center", fontSize: "12px" }}>
               <a
                 href="https://github.com/shubhankartiwari99"
                 target="_blank"
                 rel="noopener noreferrer"
-                style={{ color: "var(--accent)", textDecoration: "none", fontWeight: 600 }}
+                style={{ color: "var(--accent)", textDecoration: "none", fontWeight: 500 }}
               >
-                Shubhankar Tiwari
-              </a>{" "}
-              (Columbia University)
-            </span>
-            <div style={{ display: "flex", gap: "14px", alignItems: "center" }}>
+                GitHub ↗
+              </a>
               <a
-                href="https://github.com/shubhankartiwari99/stratumapply"
+                href="https://www.linkedin.com/in/shubhankartiwari"
                 target="_blank"
                 rel="noopener noreferrer"
-                style={{ color: "var(--text-muted)", fontSize: "11px", textDecoration: "none" }}
+                style={{ color: "#00A3FF", textDecoration: "none", fontWeight: 500 }}
               >
-                GitHub Repo ↗
+                LinkedIn ↗
               </a>
               <button onClick={() => setActiveSection("portals")}>Manage Portals</button>
             </div>
