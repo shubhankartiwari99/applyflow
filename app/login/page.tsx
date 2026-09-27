@@ -145,7 +145,16 @@ export default function LoginPage() {
 
       <footer className="login-footer">
         <span>
-          <span className="footer-spark">✦</span> StratumApply — Your multi-portal career command center
+          <span className="footer-spark">✦</span> StratumApply — Architected by{" "}
+          <a
+            href="https://github.com/shubhankartiwari99"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: "var(--accent)", textDecoration: "none", fontWeight: 600 }}
+          >
+            Shubhankar Tiwari
+          </a>{" "}
+          · Columbia University
         </span>
       </footer>
     </main>

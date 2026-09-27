@@ -25,7 +25,7 @@
 - **🧠 AI Cover Letter Studio**: Synthesizes job-specific cover letters that learn from your previous submissions and writing style. Adjust tone between *Technical / Engineering*, *Executive & Visionary*, *Direct & Punchy*, or *Academic / Research*.
 - **📊 Algorithmic Fit Scorer**: Evaluates job descriptions against target roles (AI Engineer, ML Intern, Quant, Data Science), locations, and visa constraints to calculate a 0–100 match score.
 - **🛡️ Human-In-The-Loop Review Gate**: Zero accidental or uncontrolled submissions. StratumApply prepares the full dossier, matches credentials, and halts at an interactive review modal for your final stamp of approval.
-- **🔐 Privacy & Zero-Credential Architecture**: No passwords or session cookies are ever stored. Auth is handled via passwordless HMAC-hashed email OTPs.
+- **🔐 Privacy & Secure Passkey Architecture**: Zero plain-text credentials stored. Personal passkeys are individually salted and cryptographically hashed with PBKDF2 (SHA-512, 100,000 iterations). Candidate workspaces remain private, self-service, and cookie-secured.
 - **⚡ Dual-Store Data Layer**: Seamless transition between **Neon Serverless PostgreSQL** in production and an **instant In-Memory store** for zero-dependency local development.
 - **🧪 100% Tested**: Vitest unit test suite verifying cryptographic hashing, status transition state machines, portal definitions, and application preparer logic.
 
@@ -81,8 +81,7 @@ flowchart TD
 - **Framework**: [Next.js 15 (App Router)](https://nextjs.org/)
 - **UI & State**: [React 19](https://react.dev/), Vanilla CSS Design System with Glassmorphism & Micro-animations
 - **Database**: [Neon Serverless PostgreSQL](https://neon.tech/) (`@neondatabase/serverless`)
-- **Authentication**: Passwordless Email OTP with `node:crypto` HMAC SHA-256 & `HttpOnly` Secure Cookie Sessions
-- **Email Delivery**: [Resend](https://resend.com/)
+- **Authentication**: Salted Passkey with `node:crypto` PBKDF2 SHA-512 (100,000 iterations) & `HttpOnly` Secure Cookie Sessions
 - **AI Intelligence**: OpenAI API integration (`gpt-4o`) with robust heuristic fallbacks
 - **Testing**: [Vitest 4](https://vitest.dev/)
 
@@ -102,16 +101,16 @@ npm install
 ```
 
 ### 2. Run Local Development Server
-To launch in local demo mode (no external email or database credentials required):
+To launch in local mode (with zero external database or email dependencies required):
 
 ```bash
-ALLOW_DEMO_AUTH=true npm run dev
+npm run dev
 ```
 
-Visit [http://localhost:3000](http://localhost:3000). Enter any email (e.g. `engineer@columbia.edu`), and the OTP will be displayed directly on the screen for instant access.
+Visit [http://localhost:3000](http://localhost:3000). Enter your email and choose any passkey to immediately create your private isolated workspace.
 
 ### 3. Run the Unit Test Suite
-Run the 26 unit tests verifying all core modules:
+Run the 27 unit tests verifying all core modules:
 
 ```bash
 npm test
@@ -132,7 +131,7 @@ StratumApply is architected for zero-configuration deployment to [Vercel](https:
 1. **Import Repository**: Connect `shubhankartiwari99/stratumapply` in the Vercel Dashboard.
 2. **Attach Neon Database**:
    - Install the **Neon** integration from the Vercel Marketplace, or supply an existing PostgreSQL connection string via `DATABASE_URL`.
-   - The database schema (`db/schema.sql`) automatically provisions on the first authenticated request.
+   - The database schema (`db/schema.sql`) automatically provisions tables and migrations on the first authenticated request.
 3. **Configure Environment Variables**:
    Add the following in **Vercel Settings → Environment Variables**:
 
@@ -149,10 +148,23 @@ StratumApply is architected for zero-configuration deployment to [Vercel](https:
 
 ## 🔒 Security & Privacy Model
 
-- **No Stored Passwords**: StratumApply never requests, collects, or stores passwords, multi-factor codes, or third-party session tokens.
-- **Cryptographic User IDs**: In the database, user emails are stored as irreversible HMAC hashes using your `AUTH_SECRET`.
-- **Stateless Isolation**: Each candidate gets a totally isolated workspace. Cascade delete constraints ensure complete data purge if requested.
+- **PBKDF2 SHA-512 Passkeys**: Passwords/passkeys are never stored in plain text. Every passkey is protected with a unique 32-byte cryptographic salt and 100,000 rounds of PBKDF2 SHA-512 hashing.
+- **Cryptographic User Isolation**: In the database, user identifiers are stored as irreversible HMAC hashes using your `AUTH_SECRET`.
+- **Stateless Candidate Isolation**: Each candidate gets a totally isolated workspace. Cascade delete constraints ensure complete data purge if requested.
 - **Ethical Automation**: StratumApply acts as an intelligence assistant and copilot. It never runs blind headless submissions or bypasses CAPTCHAs.
+
+---
+
+## 👨‍💻 Creator & Engineering Lead
+
+**Shubhankar Tiwari**  
+*Columbia University*
+
+[![GitHub](https://img.shields.io/badge/GitHub-shubhankartiwari99-181717?style=flat-square&logo=github)](https://github.com/shubhankartiwari99)
+[![Repository](https://img.shields.io/badge/Repository-stratumapply-00E599?style=flat-square&logo=git)](https://github.com/shubhankartiwari99/stratumapply)
+[![Email](https://img.shields.io/badge/Email-st3907%40columbia.edu-blue?style=flat-square&logo=gmail)](mailto:st3907@columbia.edu)
+
+Designed and engineered at Columbia University to automate multi-portal internship tracking, AI-augmented cover letter synthesis, and human-verified ATS submission pipelines across Handshake, LinkedIn, Greenhouse, and Lever.
 
 ---
 

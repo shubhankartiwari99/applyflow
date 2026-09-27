@@ -1262,6 +1262,39 @@ export default function Home() {
               <button type="submit" className="primary-button">{profileSaved ? "Saved ✓" : "Save Changes"}</button>
             </div>
           </form>
+
+          {/* ── Creator & Architecture Card ── */}
+          <div className="form-card" style={{ marginTop: 24, border: "1px solid rgba(0, 229, 153, 0.2)", background: "linear-gradient(135deg, rgba(13, 20, 32, 0.85), rgba(16, 28, 48, 0.65))" }}>
+            <div className="subpage-section-heading">
+              <h2>About StratumApply & Creator Credits</h2>
+            </div>
+            <div style={{ display: "flex", gap: "20px", alignItems: "flex-start", padding: "8px 0" }}>
+              <div style={{ width: 48, height: 48, borderRadius: "50%", background: "linear-gradient(135deg, #00E599, #00A3FF)", display: "flex", alignItems: "center", justifyContent: "center", color: "#0B0F19", fontWeight: 800, fontSize: 18, flexShrink: 0 }}>
+                ST
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 700, fontSize: 15, color: "#fff", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <span>Shubhankar Tiwari</span>
+                  <span style={{ fontSize: 11, background: "rgba(0, 229, 153, 0.15)", color: "#00E599", padding: "2px 8px", borderRadius: 4, fontWeight: 600 }}>Creator & Lead Architect</span>
+                  <span style={{ fontSize: 11, background: "rgba(0, 163, 255, 0.15)", color: "#00A3FF", padding: "2px 8px", borderRadius: 4, fontWeight: 600 }}>Columbia University</span>
+                </div>
+                <p style={{ margin: "6px 0 12px 0", fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>
+                  Engineered at Columbia University to provide an intelligent, human-in-the-loop command center for internship discovery, contextual AI cover letter generation, and verified submissions across Handshake, LinkedIn, Greenhouse, and Lever.
+                </p>
+                <div style={{ display: "flex", gap: 18, fontSize: 12, flexWrap: "wrap" }}>
+                  <a href="https://github.com/shubhankartiwari99/stratumapply" target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)", textDecoration: "none", fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}>
+                    <span>📂</span> GitHub Repository ↗
+                  </a>
+                  <a href="https://github.com/shubhankartiwari99" target="_blank" rel="noopener noreferrer" style={{ color: "#fff", textDecoration: "none", display: "flex", alignItems: "center", gap: 4 }}>
+                    <span>👤</span> @shubhankartiwari99
+                  </a>
+                  <a href="mailto:st3907@columbia.edu" style={{ color: "var(--text-muted)", textDecoration: "none", display: "flex", alignItems: "center", gap: 4 }}>
+                    <span>✉️</span> st3907@columbia.edu
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
         </>
       );
     }
@@ -1620,6 +1653,10 @@ export default function Home() {
             <span><Icon name="shield" /></span>
             <span>Client-controlled browser session. Your data stays in your personal workspace.</span>
           </div>
+          <div style={{ padding: "8px 12px", marginTop: "8px", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "11px", color: "var(--text-muted)" }}>
+            <span>Architected by <a href="https://github.com/shubhankartiwari99" target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)", textDecoration: "none", fontWeight: 600 }}>Shubhankar</a></span>
+            <span style={{ fontSize: "10px", background: "rgba(0, 229, 153, 0.12)", color: "var(--accent)", padding: "1px 6px", borderRadius: "4px" }}>Columbia</span>
+          </div>
         </div>
       </aside>
 
@@ -1640,8 +1677,29 @@ export default function Home() {
           {renderWorkspacePage()}
 
           <footer className="page-footer">
-            <span><span className="footer-spark">✦</span> StratumApply v2 — Intelligent Human-in-the-Loop Job Application Engine</span>
-            <button onClick={() => setActiveSection("portals")}>Manage Connected Portals</button>
+            <span>
+              <span className="footer-spark">✦</span> StratumApply v2 · Created by{" "}
+              <a
+                href="https://github.com/shubhankartiwari99"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: "var(--accent)", textDecoration: "none", fontWeight: 600 }}
+              >
+                Shubhankar Tiwari
+              </a>{" "}
+              (Columbia University)
+            </span>
+            <div style={{ display: "flex", gap: "14px", alignItems: "center" }}>
+              <a
+                href="https://github.com/shubhankartiwari99/stratumapply"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: "var(--text-muted)", fontSize: "11px", textDecoration: "none" }}
+              >
+                GitHub Repo ↗
+              </a>
+              <button onClick={() => setActiveSection("portals")}>Manage Portals</button>
+            </div>
           </footer>
         </div>
       </main>
