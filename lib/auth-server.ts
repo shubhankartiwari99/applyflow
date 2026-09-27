@@ -39,12 +39,16 @@ export function userIdFromRequest(request: Request) {
   return userId;
 }
 
-export function productionAuthError() {
-  if (process.env.NODE_ENV !== "production") return null;
-  const missing = ["DATABASE_URL", "AUTH_SECRET", "RESEND_API_KEY", "RESEND_FROM_EMAIL"].filter((name) => !process.env[name]);
-  return missing.length ? `Production authentication is not configured. Missing: ${missing.join(", ")}.` : null;
-}
-
 export function isDemoAuthAllowed() {
   return process.env.NODE_ENV !== "production" || process.env.ALLOW_DEMO_AUTH === "true";
+}
+
+export function productionAuthError() {
+  if (process.env.NODE_ENV !== "production") return null;
+  if (isDemoAuthAllowed()) {
+    const missing = ["AUTH_SECRET"].filter((name) => !process.env[name]);
+    return missing.length ? `Production authentication is not configured. Missing: ${missing.join(", ")}.` : null;
+  }
+  const missing = ["DATABASE_URL", "AUTH_SECRET", "RESEND_API_KEY", "RESEND_FROM_EMAIL"].filter((name) => !process.env[name]);
+  return missing.length ? `Production authentication is not configured. Missing: ${missing.join(", ")}.` : null;
 }
