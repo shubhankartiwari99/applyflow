@@ -6,6 +6,8 @@
 CREATE TABLE IF NOT EXISTS applyflow_users (
   id TEXT PRIMARY KEY,
   email_hash TEXT UNIQUE NOT NULL,
+  password_hash TEXT,
+  password_salt TEXT,
   workspace JSONB NOT NULL DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

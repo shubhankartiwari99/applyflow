@@ -1,5 +1,5 @@
 import { neon } from "@neondatabase/serverless";
-import { emailHash, hashOtp, randomId } from "./auth-crypto";
+import { emailHash, generateSalt, hashOtp, hashPassword, randomId, verifyPassword } from "./auth-crypto";
 
 export type WorkspaceData = {
   jobs?: unknown[];
@@ -8,9 +8,11 @@ export type WorkspaceData = {
   portalStatuses?: Record<string, unknown>;
 };
 
-type StoredUser = {
+export type StoredUser = {
   id: string;
   emailHash: string;
+  passwordHash?: string | null;
+  passwordSalt?: string | null;
   workspace: WorkspaceData;
 };
 
@@ -56,10 +58,14 @@ async function ensureSchema() {
       await client`CREATE TABLE IF NOT EXISTS applyflow_users (
         id TEXT PRIMARY KEY,
         email_hash TEXT UNIQUE NOT NULL,
+        password_hash TEXT,
+        password_salt TEXT,
         workspace JSONB NOT NULL DEFAULT '{}'::jsonb,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )`;
+      await client`ALTER TABLE applyflow_users ADD COLUMN IF NOT EXISTS password_hash TEXT`;
+      await client`ALTER TABLE applyflow_users ADD COLUMN IF NOT EXISTS password_salt TEXT`;
       await client`CREATE TABLE IF NOT EXISTS applyflow_otp_challenges (
         id TEXT PRIMARY KEY,
         email_hash TEXT NOT NULL,
@@ -75,6 +81,93 @@ async function ensureSchema() {
     });
   }
   await schemaPromise;
+}
+
+/**
+ * Authenticate an existing user or register a new user using their private passkey.
+ * Returns the authenticated user record and a flag indicating if this was a new registration.
+ */
+export async function authenticateOrRegisterUser(
+  email: string,
+  passkey: string
+): Promise<{ user: StoredUser; isNewUser: boolean }> {
+  const hashedEmail = emailHash(email);
+  const client = sql();
+
+  if (!client) {
+    let user = memoryUsers.get(hashedEmail);
+    if (!user) {
+      const salt = generateSalt();
+      const hash = hashPassword(passkey, salt);
+      user = {
+        id: randomId(),
+        emailHash: hashedEmail,
+        passwordHash: hash,
+        passwordSalt: salt,
+        workspace: {},
+      };
+      memoryUsers.set(hashedEmail, user);
+      return { user, isNewUser: true };
+    }
+
+    if (user.passwordHash && user.passwordSalt) {
+      const isValid = verifyPassword(passkey, user.passwordSalt, user.passwordHash);
+      if (!isValid) {
+        throw new Error("Incorrect passkey. Please check your password and try again.");
+      }
+      return { user, isNewUser: false };
+    }
+
+    // Set passkey for existing legacy user without password
+    const salt = generateSalt();
+    user.passwordSalt = salt;
+    user.passwordHash = hashPassword(passkey, salt);
+    return { user, isNewUser: false };
+  }
+
+  await ensureSchema();
+  const rows = (await client`
+    SELECT id, email_hash, password_hash, password_salt, workspace 
+    FROM applyflow_users 
+    WHERE email_hash = ${hashedEmail} 
+    LIMIT 1
+  `) as Array<{
+    id: string;
+    email_hash: string;
+    password_hash: string | null;
+    password_salt: string | null;
+    workspace: WorkspaceData;
+  }>;
+
+  if (rows.length === 0) {
+    const id = randomId();
+    const salt = generateSalt();
+    const hash = hashPassword(passkey, salt);
+    await client`
+      INSERT INTO applyflow_users (id, email_hash, password_hash, password_salt, workspace)
+      VALUES (${id}, ${hashedEmail}, ${hash}, ${salt}, '{}'::jsonb)
+    `;
+    return { user: { id, emailHash: hashedEmail, workspace: {} }, isNewUser: true };
+  }
+
+  const row = rows[0];
+  if (row.password_hash && row.password_salt) {
+    const isValid = verifyPassword(passkey, row.password_salt, row.password_hash);
+    if (!isValid) {
+      throw new Error("Incorrect passkey. Please check your password and try again.");
+    }
+    return { user: { id: row.id, emailHash: row.email_hash, workspace: row.workspace ?? {} }, isNewUser: false };
+  }
+
+  // Set passkey if record had null password
+  const salt = generateSalt();
+  const hash = hashPassword(passkey, salt);
+  await client`
+    UPDATE applyflow_users 
+    SET password_hash = ${hash}, password_salt = ${salt}, updated_at = NOW() 
+    WHERE id = ${row.id}
+  `;
+  return { user: { id: row.id, emailHash: row.email_hash, workspace: row.workspace ?? {} }, isNewUser: false };
 }
 
 export async function createOtpChallenge(email: string) {
@@ -113,7 +206,7 @@ export async function verifyOtpChallenge(email: string, code: string) {
   }
 
   await ensureSchema();
-  const rows = await client`SELECT id, otp_hash, expires_at, attempts FROM applyflow_otp_challenges WHERE email_hash = ${hashedEmail} ORDER BY created_at DESC LIMIT 1` as Array<{ id: string; otp_hash: string; expires_at: string; attempts: number }>;
+  const rows = (await client`SELECT id, otp_hash, expires_at, attempts FROM applyflow_otp_challenges WHERE email_hash = ${hashedEmail} ORDER BY created_at DESC LIMIT 1`) as Array<{ id: string; otp_hash: string; expires_at: string; attempts: number }>;
   const challenge = rows[0];
   if (!challenge || new Date(challenge.expires_at).getTime() <= now || challenge.attempts >= 5) return null;
   await client`UPDATE applyflow_otp_challenges SET attempts = attempts + 1 WHERE id = ${challenge.id}`;
@@ -133,7 +226,7 @@ export async function getOrCreateUserByEmailHash(hashedEmail: string) {
   }
 
   await ensureSchema();
-  const rows = await client`SELECT id, email_hash, workspace FROM applyflow_users WHERE email_hash = ${hashedEmail} LIMIT 1` as Array<{ id: string; email_hash: string; workspace: WorkspaceData }>;
+  const rows = (await client`SELECT id, email_hash, workspace FROM applyflow_users WHERE email_hash = ${hashedEmail} LIMIT 1`) as Array<{ id: string; email_hash: string; workspace: WorkspaceData }>;
   if (rows[0]) return { id: rows[0].id, emailHash: rows[0].email_hash, workspace: rows[0].workspace ?? {} } satisfies StoredUser;
   const id = randomId();
   await client`INSERT INTO applyflow_users (id, email_hash, workspace) VALUES (${id}, ${hashedEmail}, '{}'::jsonb)`;
@@ -146,7 +239,7 @@ export async function getWorkspace(userId: string) {
     return Array.from(memoryUsers.values()).find((user) => user.id === userId)?.workspace ?? null;
   }
   await ensureSchema();
-  const rows = await client`SELECT workspace FROM applyflow_users WHERE id = ${userId} LIMIT 1` as Array<{ workspace: WorkspaceData }>;
+  const rows = (await client`SELECT workspace FROM applyflow_users WHERE id = ${userId} LIMIT 1`) as Array<{ workspace: WorkspaceData }>;
   return rows[0]?.workspace ?? null;
 }
 

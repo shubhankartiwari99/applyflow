@@ -5,68 +5,51 @@ import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [step, setStep] = useState<"email" | "otp">("email");
   const [email, setEmail] = useState("");
-  const [otp, setOtp] = useState("");
-  const [generatedOtp, setGeneratedOtp] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
-  const [sending, setSending] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    fetch("/api/auth/session").then((response) => {
-      if (response.ok) router.replace("/");
-    }).catch(() => undefined);
+    fetch("/api/auth/session")
+      .then((response) => {
+        if (response.ok) router.replace("/");
+      })
+      .catch(() => undefined);
   }, [router]);
 
-  async function handleSendOtp(event: FormEvent<HTMLFormElement>) {
+  async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const targetEmail = email.trim();
     if (!targetEmail || !targetEmail.includes("@")) {
       setError("Please enter a valid email address.");
       return;
     }
-    setSending(true);
-    setError("");
-    try {
-      const response = await fetch("/api/auth/request", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: targetEmail }),
-      });
-      const result = (await response.json()) as { error?: string; demoCode?: string };
-      if (!response.ok) throw new Error(result.error ?? "We could not send a verification code.");
-
-      if (result.demoCode) {
-        setGeneratedOtp(result.demoCode);
-      }
-      setSending(false);
-      setStep("otp");
-    } catch (requestError) {
-      setSending(false);
-      setError(requestError instanceof Error ? requestError.message : "We could not send a verification code.");
-    }
-  }
-
-  async function handleVerifyOtp(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!otp.trim() || otp.trim().length !== 6) {
-      setError("Please enter the 6-digit verification code.");
+    if (!password || password.length < 6) {
+      setError("Please enter a passkey of at least 6 characters.");
       return;
     }
+
+    setLoading(true);
     setError("");
-    setSending(true);
+
     try {
-      const response = await fetch("/api/auth/verify", {
+      const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), code: otp.trim() }),
+        body: JSON.stringify({ email: targetEmail, password }),
       });
-      const result = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(result.error ?? "That code is invalid or expired.");
+
+      const result = (await response.json()) as { error?: string; ok?: boolean };
+      if (!response.ok) {
+        throw new Error(result.error ?? "Authentication failed. Please check your credentials.");
+      }
+
       router.replace("/");
-    } catch (verifyError) {
-      setError(verifyError instanceof Error ? verifyError.message : "That code is invalid or expired.");
-      setSending(false);
+    } catch (loginError) {
+      setError(loginError instanceof Error ? loginError.message : "Authentication failed.");
+      setLoading(false);
     }
   }
 
@@ -84,134 +67,87 @@ export default function LoginPage() {
             <div className="brand-name">
               stratum<span>apply</span>
             </div>
-            <div className="brand-subtitle">career &amp; internship command center</div>
+            <div className="brand-subtitle">multi-portal career command center</div>
           </div>
         </div>
 
-        {step === "email" ? (
-          <>
-            <h1 className="login-title">Sign in to your workspace</h1>
-            <p className="login-desc">
-              Enter your email to receive a 6-digit one-time code. No passwords required.
-            </p>
+        <h1 className="login-title">Access your workspace</h1>
+        <p className="login-desc">
+          Sign in or create your personal account using your private passkey.
+        </p>
 
-            <form className="login-form" onSubmit={handleSendOtp}>
-              <label className="login-label">
-                Email address
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@university.edu"
-                  autoFocus
-                  required
-                  className="login-input"
-                />
-              </label>
+        <form className="login-form" onSubmit={handleLogin}>
+          <label className="login-label">
+            Email address
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@columbia.edu"
+              autoFocus
+              required
+              className="login-input"
+            />
+          </label>
 
-              {error && <div className="login-error">{error}</div>}
-
-              <button type="submit" className="login-submit" disabled={sending}>
-                {sending ? "Sending code…" : "Send verification code"}{" "}
-                {!sending && <span className="login-arrow">→</span>}
-              </button>
-            </form>
-
-            <div className="login-privacy">
-              <span className="login-shield">⬡</span>
-              <span>
-                Each user gets an isolated, private workspace. Resumes, tailored cover letters, and application queues are strictly scoped to your email.
-              </span>
-            </div>
-          </>
-        ) : (
-          <>
-            <h1 className="login-title">Enter verification code</h1>
-            <p className="login-desc">
-              We sent a 6-digit verification code to <strong>{email}</strong>
-            </p>
-
-            {generatedOtp && (
-              <div
+          <label className="login-label" style={{ position: "relative" }}>
+            Passkey / Password
+            <div style={{ position: "relative" }}>
+              <input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter or create passkey (6+ chars)"
+                required
+                minLength={6}
+                className="login-input"
+                style={{ paddingRight: "44px" }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
                 style={{
-                  margin: "16px 0",
-                  padding: "12px 14px",
-                  borderRadius: "10px",
-                  background: "rgba(107, 92, 255, 0.08)",
-                  border: "1px solid rgba(107, 92, 255, 0.25)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  fontSize: "12px",
-                  color: "#d0d7e3",
+                  position: "absolute",
+                  right: "10px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  color: "var(--text-muted)",
+                  fontSize: "14px",
+                  padding: "4px",
                 }}
+                title={showPassword ? "Hide passkey" : "Show passkey"}
               >
-                <span>
-                  Code: <strong style={{ letterSpacing: "2px", color: "#a78bfa", fontSize: "14px" }}>{generatedOtp}</strong>
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setOtp(generatedOtp)}
-                  style={{
-                    background: "rgba(107, 92, 255, 0.2)",
-                    border: "1px solid rgba(107, 92, 255, 0.4)",
-                    color: "#fff",
-                    borderRadius: "6px",
-                    padding: "4px 10px",
-                    fontSize: "11px",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                  }}
-                >
-                  Autofill
-                </button>
-              </div>
-            )}
-
-            <form className="login-form" onSubmit={handleVerifyOtp}>
-              <label className="login-label">
-                6-digit code
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={6}
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
-                  placeholder="000000"
-                  autoFocus
-                  required
-                  className="login-input login-input-otp"
-                />
-              </label>
-
-              {error && <div className="login-error">{error}</div>}
-
-              <button type="submit" className="login-submit" disabled={sending}>
-                {sending ? "Verifying…" : "Verify & Enter Workspace"}{" "}
-                {!sending && <span className="login-arrow">→</span>}
+                {showPassword ? "👁️" : "🔒"}
               </button>
-            </form>
+            </div>
+          </label>
 
-            <button
-              className="login-back"
-              onClick={() => {
-                setStep("email");
-                setOtp("");
-                setError("");
-              }}
-            >
-              ← Use a different email
-            </button>
-          </>
-        )}
+          {error && <div className="login-error">{error}</div>}
+
+          <button type="submit" className="login-submit" disabled={loading}>
+            {loading ? "Authenticating…" : "Continue to Workspace"}{" "}
+            {!loading && <span className="login-arrow">→</span>}
+          </button>
+        </form>
+
+        <div className="login-privacy">
+          <span className="login-shield">⬡</span>
+          <span>
+            <strong>First time here?</strong> Setting your passkey now will create your account.
+            <br />
+            <strong>Returning?</strong> Enter your passkey to resume your saved applications.
+          </span>
+        </div>
       </div>
 
       <footer className="login-footer">
         <span>
-          <span className="footer-spark">✦</span> StratumApply — Your application command center
+          <span className="footer-spark">✦</span> StratumApply — Your multi-portal career command center
         </span>
       </footer>
     </main>
   );
 }
-

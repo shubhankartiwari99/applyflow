@@ -48,10 +48,15 @@ async function runMigrations(client: ReturnType<typeof neon>): Promise<void> {
   await client`CREATE TABLE IF NOT EXISTS applyflow_users (
     id TEXT PRIMARY KEY,
     email_hash TEXT UNIQUE NOT NULL,
+    password_hash TEXT,
+    password_salt TEXT,
     workspace JSONB NOT NULL DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`;
+
+  await client`ALTER TABLE applyflow_users ADD COLUMN IF NOT EXISTS password_hash TEXT`;
+  await client`ALTER TABLE applyflow_users ADD COLUMN IF NOT EXISTS password_salt TEXT`;
 
   await client`CREATE TABLE IF NOT EXISTS applyflow_otp_challenges (
     id TEXT PRIMARY KEY,

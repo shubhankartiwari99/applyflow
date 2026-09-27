@@ -140,11 +140,8 @@ StratumApply is architected for zero-configuration deployment to [Vercel](https:
    | :--- | :--- | :--- |
    | `DATABASE_URL` | Neon Postgres Connection String | `postgresql://user:pass@ep-xyz.neon.tech/neondb?sslmode=require` |
    | `AUTH_SECRET` | 32+ character random secret for session cookies | `openssl rand -hex 32` |
-   | `RESEND_API_KEY` | Resend API Key for sending login OTP emails | `re_123456789...` |
-   | `RESEND_FROM_EMAIL` | Verified sending email address | `login@yourdomain.com` |
    | `OPENAI_API_KEY` | *(Optional)* OpenAI key for custom cover letter synthesis | `sk-proj-...` |
-   | `OPENAI_MODEL` | *(Optional)* Model identifier | `gpt-4o` |
-   | `ALLOW_DEMO_AUTH` | Set to `false` in production | `false` |
+   | `OPENAI_MODEL` | *(Optional)* Model identifier (defaults to `gpt-4o`) | `gpt-4o` |
 
 4. **Deploy**: Hit **Deploy**. Your command center is live!
 

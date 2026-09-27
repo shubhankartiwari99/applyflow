@@ -6,9 +6,13 @@ import {
   randomId,
   signValue,
   authSecret,
+  generateSalt,
+  hashPassword,
+  verifyPassword,
 } from "../lib/auth-crypto";
+import { authenticateOrRegisterUser } from "../lib/store";
 
-describe("auth-crypto", () => {
+describe("auth-crypto & passkey security", () => {
   it("normalizes emails by trimming whitespace and converting to lowercase", () => {
     expect(normalizeEmail("  User@Columbia.EDU  ")).toBe("user@columbia.edu");
     expect(normalizeEmail("test.dev@GMAIL.COM")).toBe("test.dev@gmail.com");
@@ -21,16 +25,39 @@ describe("auth-crypto", () => {
     expect(hash1).toHaveLength(64);
   });
 
-  it("hashes OTP codes with challenge ID and email hash", () => {
-    const eHash = emailHash("test@columbia.edu");
-    const challengeId = "chal_123456";
-    const otp1 = hashOtp(eHash, challengeId, "123456");
-    const otp2 = hashOtp(eHash, challengeId, "123456");
-    const otp3 = hashOtp(eHash, challengeId, "654321");
+  it("hashes passwords securely with unique salts using PBKDF2", () => {
+    const salt1 = generateSalt();
+    const salt2 = generateSalt();
+    expect(salt1).not.toBe(salt2);
 
-    expect(otp1).toBe(otp2);
-    expect(otp1).not.toBe(otp3);
-    expect(otp1).toHaveLength(64);
+    const hash1 = hashPassword("supersecret123", salt1);
+    const hash2 = hashPassword("supersecret123", salt2);
+    expect(hash1).not.toBe(hash2);
+
+    // Verification passes with correct password
+    expect(verifyPassword("supersecret123", salt1, hash1)).toBe(true);
+    // Verification fails with incorrect password
+    expect(verifyPassword("wrongpass", salt1, hash1)).toBe(false);
+  });
+
+  it("authenticates and registers a new user with email and passkey", async () => {
+    const testEmail = "friend@columbia.edu";
+    const passkey = "secretPasskey2026!";
+
+    // First time registration
+    const { user, isNewUser } = await authenticateOrRegisterUser(testEmail, passkey);
+    expect(isNewUser).toBe(true);
+    expect(user.id).toBeTruthy();
+
+    // Returning user sign-in with correct passkey
+    const returning = await authenticateOrRegisterUser(testEmail, passkey);
+    expect(returning.isNewUser).toBe(false);
+    expect(returning.user.id).toBe(user.id);
+
+    // Returning user sign-in with WRONG passkey must reject
+    await expect(
+      authenticateOrRegisterUser(testEmail, "wrongPasskey!")
+    ).rejects.toThrow(/Incorrect passkey/);
   });
 
   it("generates 36-character hexadecimal random IDs", () => {
