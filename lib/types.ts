@@ -17,7 +17,7 @@ export type JobStatus =
 
 /** Allowed status transitions */
 export const JOB_STATUS_TRANSITIONS: Record<JobStatus, JobStatus[]> = {
-  discovered: ["queued", "discarded"],
+  discovered: ["queued", "preparing", "discarded"],
   queued: ["preparing", "discarded"],
   preparing: ["ready_for_review", "queued"],
   ready_for_review: ["approved", "queued", "discarded"],

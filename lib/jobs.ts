@@ -11,7 +11,7 @@ import type { JobRecord, JobStatus, JOB_STATUS_TRANSITIONS } from "./types";
 
 // Re-import the transitions map
 const STATUS_TRANSITIONS: Record<JobStatus, JobStatus[]> = {
-  discovered: ["queued", "discarded"],
+  discovered: ["queued", "preparing", "discarded"],
   queued: ["preparing", "discarded"],
   preparing: ["ready_for_review", "queued"],
   ready_for_review: ["approved", "queued", "discarded"],
