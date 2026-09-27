@@ -17,7 +17,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const status = url.searchParams.get("status") as JobStatus | null;
   const source = url.searchParams.get("source");
-  const limit = parseInt(url.searchParams.get("limit") ?? "100", 10);
+  const limit = parseInt(url.searchParams.get("limit") ?? "500", 10);
   const offset = parseInt(url.searchParams.get("offset") ?? "0", 10);
   const countsOnly = url.searchParams.get("counts") === "true";
 

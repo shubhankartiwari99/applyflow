@@ -90,6 +90,7 @@ type Portal = {
   initials: string;
   capability: string;
   connectionStatus: string;
+  type?: "ats_import" | "bookmark";
 };
 
 type ActivityItem = {
@@ -350,7 +351,8 @@ export default function Home() {
   const [reviewTone, setReviewTone] = useState<string>("technical");
   const [reviewBaseLetterId, setReviewBaseLetterId] = useState<string>("");
   const [selectedPortalForModal, setSelectedPortalForModal] = useState<Portal | null>(null);
-  const [isConnectingPortal, setIsConnectingPortal] = useState(false);
+  const [portalImportUrl, setPortalImportUrl] = useState("");
+  const [isPortalImporting, setIsPortalImporting] = useState(false);
 
   // Custom Companies & Global Search
   const [customCareerSites, setCustomCareerSites] = useState<CareerSite[]>([]);
@@ -517,7 +519,7 @@ export default function Home() {
     { label: "Active Pipeline", value: jobs.length, change: "opportunities tracked", tone: "violet", icon: "⌁" },
     { label: "Ready for Review", value: jobCounts.ready_for_review ?? 0, change: "waiting for your check", tone: "orange", icon: "⚡" },
     { label: "Applications Sent", value: jobCounts.submitted ?? 0, change: "approved & submitted", tone: "green", icon: "✓" },
-    { label: "Portals Logged In", value: portals.filter((p) => p.connectionStatus === "connected").length, change: `of ${portals.length} platforms`, tone: "blue", icon: "🔗" },
+    { label: "ATS & Portals", value: portals.length, change: "configured sources", tone: "blue", icon: "🔗" },
   ], [jobs, jobCounts, portals]);
 
   const allCareerSites = useMemo(() => {
@@ -614,8 +616,22 @@ export default function Home() {
       });
       const d = await r.json() as { jobs?: Job[]; message?: string; error?: string };
       if (!r.ok) throw new Error(d.error ?? "Could not extract positions from that link.");
-      setNotice(d.message ?? "Discovered and parsed job openings into your pipeline.");
+      if (d.jobs && d.jobs.length > 0) {
+        setJobs((current) => {
+          const map = new Map(current.map((j) => [j.id, j]));
+          for (const nj of d.jobs!) {
+            map.set(nj.id, nj);
+          }
+          return Array.from(map.values());
+        });
+        setNotice(d.message ?? `Discovered ${d.jobs.length} positions.`);
+      } else {
+        setNotice(d.message ?? "Discovered and parsed job openings into your pipeline.");
+      }
       setUrl("");
+      setFilter("All");
+      setDomainFilter("All");
+      setQuery("");
       const jr = await fetch("/api/jobs");
       if (jr.ok) { const jd = await jr.json() as { jobs: Job[] }; setJobs(jd.jobs); }
     } catch (e) {
@@ -734,14 +750,35 @@ export default function Home() {
 
   async function approveApplication(job: Job) {
     try {
+      // 1. Copy the tailored cover letter to clipboard
+      if (editedCoverLetter) {
+        try {
+          await navigator.clipboard.writeText(editedCoverLetter);
+        } catch {
+          // Clipboard write may require user action in some environments
+        }
+      }
+
+      // 2. Open apply URL in new tab if available
+      if (job.applyUrl) {
+        window.open(job.applyUrl, "_blank", "noopener,noreferrer");
+      }
+
+      // 3. Mark as submitted on server
       await fetch(`/api/jobs/${job.id}/submit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ coverLetter: editedCoverLetter }),
       });
 
-      // Update local state
-      setJobs((c) => c.map((j) => j.id === job.id ? { ...j, status: "submitted" as JobStatus, generatedCoverLetter: editedCoverLetter, submittedAt: new Date().toISOString() } : j));
+      // 4. Update local state
+      setJobs((c) =>
+        c.map((j) =>
+          j.id === job.id
+            ? { ...j, status: "submitted" as JobStatus, generatedCoverLetter: editedCoverLetter, submittedAt: new Date().toISOString() }
+            : j
+        )
+      );
 
       // Refresh cover letters corpus to include newly submitted letter
       fetch("/api/cover-letters").then(async (r) => {
@@ -749,7 +786,11 @@ export default function Home() {
       }).catch(() => undefined);
 
       setReviewingJob(null);
-      setNotice(`✓ Approved and marked application for ${job.company} as Submitted! Letter added to AI learning corpus.`);
+      setNotice(
+        job.applyUrl
+          ? `✓ Cover letter copied to clipboard & opened apply page for ${job.company}! Application marked as Submitted.`
+          : `✓ Application marked as Submitted for ${job.company}! Letter saved to your AI corpus.`
+      );
     } catch {
       setNotice("Could not submit application.");
     }
@@ -778,20 +819,24 @@ export default function Home() {
     const file = event.target.files?.[0];
     if (!file) return;
     try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("name", file.name);
       const isCL = file.name.toLowerCase().includes("cover");
+      formData.append("kind", isCL ? "cover_letter" : "resume");
+
       const r = await fetch("/api/documents", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: file.name,
-          kind: isCL ? "cover_letter" : "resume",
-          contentText: file.type.includes("text") ? await file.text() : undefined,
-        }),
+        body: formData,
+        // Browser sets multipart boundary automatically
       });
       if (r.ok) {
         const d = await r.json() as { document: DocumentItem };
         setDocuments((c) => [d.document, ...c]);
-        setNotice(`Uploaded ${file.name}. Processed for AI context matching.`);
+        setNotice(`Uploaded ${file.name}. PDF/DOCX text extracted for AI matching.`);
+      } else {
+        const d = await r.json().catch(() => ({}));
+        setNotice(d.error || "Upload failed.");
       }
     } catch {
       setNotice("Upload failed.");
@@ -950,14 +995,18 @@ export default function Home() {
   async function applyStudioResultToJob() {
     if (!studioResult || !studioTarget.jobId) return;
     try {
-      await fetch(`/api/jobs/${studioTarget.jobId}`, {
-        method: "PATCH",
+      const res = await fetch(`/api/jobs/${studioTarget.jobId}`, {
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           generatedCoverLetter: studioResult,
           status: "ready_for_review",
         }),
       });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error || "Failed to update job");
+      }
       setJobs((c) =>
         c.map((j) =>
           j.id === studioTarget.jobId
@@ -966,8 +1015,8 @@ export default function Home() {
         )
       );
       setNotice(`✓ Tailored cover letter attached directly to job dossier! Application is ready for review.`);
-    } catch {
-      setNotice("Could not attach cover letter to job.");
+    } catch (e) {
+      setNotice(e instanceof Error ? e.message : "Could not attach cover letter to job.");
     }
   }
 
@@ -1000,51 +1049,69 @@ export default function Home() {
     }
   }
 
-  // ─── Actions: Portals (100% In-App Direct Connect) ───
+  // ─── Actions: Portals & ATS Ingest ───
   function openPortal(portal: Portal) {
-    setSelectedPortalForModal(portal);
-    setNotice(`Opened in-app connection gateway for ${portal.name}. Connecting directly within your workspace.`);
+    const isATS = portal.type === "ats_import" || portal.id === "greenhouse" || portal.id === "lever";
+    if (isATS) {
+      setSelectedPortalForModal(portal);
+      setPortalImportUrl(portal.id === "greenhouse" ? "https://boards.greenhouse.io/" : "https://jobs.lever.co/");
+    } else {
+      window.open(portal.loginUrl, "_blank", "noopener,noreferrer");
+      setNotice(`Opened ${portal.name} in a new tab.`);
+    }
+  }
+
+  async function handlePortalImport() {
+    let target = portalImportUrl.trim();
+    if (!target) return;
+    if (selectedPortalForModal && !target.startsWith("http")) {
+      if (selectedPortalForModal.id === "greenhouse") {
+        target = `https://boards.greenhouse.io/${target}`;
+      } else if (selectedPortalForModal.id === "lever") {
+        target = `https://jobs.lever.co/${target}`;
+      }
+    }
+    setIsPortalImporting(true);
+    try {
+      const r = await fetch("/api/discovery", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: target }),
+      });
+      const d = await r.json() as { jobs?: Job[]; message?: string; error?: string };
+      if (!r.ok) throw new Error(d.error ?? "Could not import jobs from that board.");
+      if (d.jobs && d.jobs.length > 0) {
+        setJobs((current) => {
+          const map = new Map(current.map((j) => [j.id, j]));
+          for (const nj of d.jobs!) {
+            map.set(nj.id, nj);
+          }
+          return Array.from(map.values());
+        });
+        setNotice(d.message ?? `Imported ${d.jobs.length} jobs directly into your queue!`);
+      } else {
+        setNotice(d.message ?? "Scan complete. No matching early-career roles found on board.");
+      }
+      setFilter("All");
+      setDomainFilter("All");
+      setQuery("");
+      setSelectedPortalForModal(null);
+      setPortalImportUrl("");
+      const jr = await fetch("/api/jobs");
+      if (jr.ok) { const jd = await jr.json() as { jobs: Job[] }; setJobs(jd.jobs); }
+    } catch (e) {
+      setNotice(e instanceof Error ? e.message : "Import failed.");
+    } finally {
+      setIsPortalImporting(false);
+    }
   }
 
   async function connectPortalInternally(portalId: string) {
-    setIsConnectingPortal(true);
-    try {
-      const res = await fetch("/api/portals", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ portal: portalId, status: "connected" }),
-      });
-      if (!res.ok) throw new Error("Server rejected the connection.");
-      const portalName = portals.find((p) => p.id === portalId)?.name ?? portalId;
-      setPortals((c) => c.map((p) => p.id === portalId ? { ...p, connectionStatus: "connected" } : p));
-      setSelectedPortalForModal((prev) => prev?.id === portalId ? { ...prev, connectionStatus: "connected" } : prev);
-      setNotice(`✓ ${portalName} session connected. Engine will use this session for job discovery.`);
-      setTimeout(() => setSelectedPortalForModal(null), 1500);
-    } catch (e) {
-      setNotice(e instanceof Error ? e.message : "Could not establish session.");
-    } finally {
-      setIsConnectingPortal(false);
-    }
+    setPortals((c) => c.map((p) => p.id === portalId ? { ...p, connectionStatus: "connected" } : p));
   }
 
   async function disconnectPortal(portalId: string) {
-    setIsConnectingPortal(true);
-    try {
-      const res = await fetch("/api/portals", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ portal: portalId, status: "disconnected" }),
-      });
-      if (!res.ok) throw new Error("Server rejected the disconnect.");
-      const portalName = portals.find((p) => p.id === portalId)?.name ?? portalId;
-      setPortals((c) => c.map((p) => p.id === portalId ? { ...p, connectionStatus: "disconnected" } : p));
-      setSelectedPortalForModal((prev) => prev?.id === portalId ? { ...prev, connectionStatus: "disconnected" } : prev);
-      setNotice(`${portalName} session disconnected.`);
-    } catch (e) {
-      setNotice(e instanceof Error ? e.message : "Could not disconnect session.");
-    } finally {
-      setIsConnectingPortal(false);
-    }
+    setPortals((c) => c.map((p) => p.id === portalId ? { ...p, connectionStatus: "disconnected" } : p));
   }
 
   // ─── Actions: Manual Job Addition ───
@@ -1112,10 +1179,10 @@ export default function Home() {
           <section className="subpage-hero">
             <div>
               <div className="eyebrow"><span className="eyebrow-line" />INTERNAL GATEWAY & PORTALS</div>
-              <h1>Career Portals & In-App Direct Sessions</h1>
-              <p>Connect directly to Handshake, LinkedIn, Greenhouse, Lever, and Workday from within StratumApply. No external browser tabs, zero third-party redirects.</p>
+              <h1>Career Portals & ATS Ingest</h1>
+              <p>Directly ingest live postings from Greenhouse & Lever via public ATS APIs, and launch bookmarks for external career portals.</p>
             </div>
-            <span className="privacy-chip"><Icon name="shield" /> 100% Internal Workspace Session</span>
+            <span className="privacy-chip"><Icon name="shield" /> Real ATS APIs · No Fake Logins</span>
           </section>
 
           <div className="portal-grid">
@@ -1123,38 +1190,54 @@ export default function Home() {
               <div className="empty-state" style={{ gridColumn: "1/-1", padding: 40 }}>
                 <div>🔗</div>
                 <strong>Loading portals…</strong>
-                <span>Connecting to your workspace session.</span>
+                <span>Loading configured platforms and ATS sources.</span>
               </div>
-            ) : portals.map((portal) => (
-              <div key={portal.id} className="portal-card">
-                <div className="portal-card-top">
-                  <div className="portal-logo" style={{ background: `${portal.accent}20`, color: portal.accent }}>{portal.initials}</div>
-                  <div>
-                    <h3>{portal.name}</h3>
-                    <p>{portal.subtitle}</p>
+            ) : portals.map((portal) => {
+              const isATS = portal.type === "ats_import" || portal.id === "greenhouse" || portal.id === "lever";
+              return (
+                <div key={portal.id} className="portal-card">
+                  <div className="portal-card-top">
+                    <div className="portal-logo" style={{ background: `${portal.accent}20`, color: portal.accent }}>{portal.initials}</div>
+                    <div>
+                      <h3>{portal.name}</h3>
+                      <p>{portal.subtitle}</p>
+                    </div>
+                    <span className={`portal-status ${isATS ? "ready" : "not-connected"}`}>
+                      {isATS ? "● Public ATS API" : "↗ Portal Bookmark"}
+                    </span>
                   </div>
-                  <span className={`portal-status ${portal.connectionStatus === "connected" ? "ready" : "not-connected"}`}>
-                    {portal.connectionStatus === "connected" ? "● Connected" : "○ Not Connected"}
-                  </span>
+                  <div className="portal-capability"><Icon name="shield" /> {portal.capability}</div>
+                  <div className="portal-card-actions">
+                    {isATS ? (
+                      <button
+                        className="primary-button"
+                        style={{ width: "100%", height: 36, fontSize: 12 }}
+                        onClick={() => openPortal(portal)}
+                      >
+                        ⚡ Import Jobs from Board
+                      </button>
+                    ) : (
+                      <button
+                        className="small-button secondary"
+                        style={{ width: "100%", height: 36, fontSize: 12 }}
+                        onClick={() => {
+                          window.open(portal.loginUrl, "_blank", "noopener,noreferrer");
+                          setNotice(`Opened ${portal.name} in a new tab.`);
+                        }}
+                      >
+                        Open in New Tab ↗
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div className="portal-capability"><Icon name="shield" /> {portal.capability}</div>
-                <div className="portal-card-actions">
-                  <button
-                    className={portal.connectionStatus === "connected" ? "small-button secondary" : "primary-button"}
-                    style={{ width: "100%", height: 36, fontSize: 12 }}
-                    onClick={() => openPortal(portal)}
-                  >
-                    {portal.connectionStatus === "connected" ? "✓ Connected — Manage Session" : "⚡ Connect to Session"}
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <div className="portal-note" style={{ marginTop: 24, border: "1px solid rgba(0, 229, 153, 0.25)", background: "rgba(0, 229, 153, 0.04)" }}>
             <span style={{ color: "var(--accent)" }}>⬡</span>
             <div>
-              <strong style={{ color: "#fff" }}>100% In-App Direct Sessions:</strong> StratumApply connects internally through direct API tunnels and in-app session relays. You never have to leave StratumApply to sign into external websites; all job discovery, dossier preparation, and application submissions operate completely inside your secure workspace.
+              <strong style={{ color: "#fff" }}>Honest ATS & Portal Architecture:</strong> StratumApply uses official public ATS endpoints (Greenhouse & Lever) to fetch live job postings and job descriptions without needing authentication or fake logins. For campus and enterprise platforms (Handshake, LinkedIn, Workday), use the portal links to launch external pages directly in your browser.
             </div>
           </div>
         </>
@@ -2459,7 +2542,7 @@ export default function Home() {
                   </div>
                 )}
 
-                {reviewingJob.applyUrl && (
+                {reviewingJob.applyUrl ? (
                   <div className="review-section" style={{ background: "rgba(0, 229, 153, 0.04)", border: "1px solid rgba(0, 229, 153, 0.2)", borderRadius: "var(--radius-sm)", padding: "12px 14px" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                       <h3 style={{ fontSize: 11, fontWeight: 700, color: "var(--accent)", letterSpacing: "0.06em", textTransform: "uppercase" }}>Application Link</h3>
@@ -2468,6 +2551,11 @@ export default function Home() {
                       style={{ fontSize: 11, color: "var(--accent)", wordBreak: "break-all", textDecoration: "underline" }}>
                       {reviewingJob.applyUrl} ↗
                     </a>
+                  </div>
+                ) : (
+                  <div className="review-section" style={{ background: "rgba(255, 170, 0, 0.04)", border: "1px solid rgba(255, 170, 0, 0.2)", borderRadius: "var(--radius-sm)", padding: "12px 14px" }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#ffaa00", marginBottom: 4 }}>NO DIRECT APPLY LINK</div>
+                    <p style={{ fontSize: 11, color: "var(--text-secondary)", margin: 0 }}>This job entry has no automated apply URL. You can still copy your generated cover letter and apply on the company's career page.</p>
                   </div>
                 )}
               </div>
@@ -2553,14 +2641,29 @@ export default function Home() {
               <button className="review-discard-btn" onClick={() => discardJob(reviewingJob.id)}>
                 <Icon name="trash" /> Remove Job
               </button>
-              <div className="review-footer-actions">
+              <div className="review-footer-actions" style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
                 {reviewingJob.status !== "submitted" ? (
-                  <button className="primary-button review-approve" onClick={() => approveApplication(reviewingJob)}>
-                    <Icon name="check" /> Submit Application Internally (Direct Tunnel)
-                  </button>
+                  <>
+                    <button className="primary-button review-approve" onClick={() => approveApplication(reviewingJob)}>
+                      {reviewingJob.applyUrl ? (
+                        <>
+                          📋 Copy Letter & Open Apply Page ↗
+                        </>
+                      ) : (
+                        <>
+                          <Icon name="check" /> Mark as Submitted
+                        </>
+                      )}
+                    </button>
+                    <span style={{ fontSize: 10, color: "var(--text-muted)" }}>
+                      {reviewingJob.applyUrl
+                        ? "Copies tailored letter to clipboard, opens application page in new tab, and marks as Submitted"
+                        : "Saves letter to corpus and marks application as Submitted"}
+                    </span>
+                  </>
                 ) : (
                   <span style={{ fontSize: 11, color: "var(--accent)", fontWeight: 600 }}>
-                    ✓ Application Submitted Internally to {reviewingJob.company}
+                    ✓ Application Marked as Submitted for {reviewingJob.company}
                   </span>
                 )}
               </div>
@@ -2765,22 +2868,22 @@ export default function Home() {
         </div>
       )}
 
-      {/* ── IN-APP DIRECT PORTAL GATEWAY CONSOLE MODAL ── */}
+      {/* ── ATS BOARD IMPORT MODAL ── */}
       {selectedPortalForModal && (
         <div className="portal-gateway-overlay" onClick={(e) => { if (e.target === e.currentTarget) setSelectedPortalForModal(null); }}>
-          <div className="portal-gateway-modal">
+          <div className="portal-gateway-modal" style={{ maxWidth: 540 }}>
             <div className="gateway-header">
               <div className="gateway-header-left">
                 <div className="gateway-logo" style={{ background: `${selectedPortalForModal.accent}20`, color: selectedPortalForModal.accent }}>
                   {selectedPortalForModal.initials}
                 </div>
                 <div>
-                  <div className="eyebrow"><span className="eyebrow-line" />INTERNAL PORTAL GATEWAY</div>
+                  <div className="eyebrow"><span className="eyebrow-line" />PUBLIC ATS INGEST</div>
                   <h2 style={{ fontSize: 18, fontWeight: 800, color: "#fff" }}>
-                    {selectedPortalForModal.name} Direct Session
+                    Import from {selectedPortalForModal.name}
                   </h2>
                   <p style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 2 }}>
-                    {selectedPortalForModal.subtitle} · 100% In-App Session Relay (Zero Third-Party Redirects)
+                    {selectedPortalForModal.subtitle} · Live API Ingest
                   </p>
                 </div>
               </div>
@@ -2789,65 +2892,57 @@ export default function Home() {
               </button>
             </div>
 
-            {/* Gateway Connect Panel */}
-            <div className="gateway-terminal" style={{ marginBottom: 16 }}>
-              <div className="terminal-line active">
-                <span>›</span>
-                <span>INIT: Connecting StratumApply internal session to {selectedPortalForModal.name}...</span>
+            <div style={{ padding: "16px 0" }}>
+              <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 12 }}>
+                Enter any company board slug or full URL to import live openings, job descriptions, and direct apply links into your queue.
+              </p>
+
+              <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                <input
+                  type="text"
+                  placeholder={selectedPortalForModal.id === "greenhouse" ? "e.g. openai, anthropic, or https://boards.greenhouse.io/stripe" : "e.g. netflix, or https://jobs.lever.co/spotify"}
+                  value={portalImportUrl}
+                  onChange={(e) => setPortalImportUrl(e.target.value)}
+                  style={{ flex: 1, padding: "8px 12px", background: "var(--bg-tertiary)", border: "1px solid var(--border-default)", borderRadius: "var(--radius-sm)", color: "#fff", fontSize: 13 }}
+                  onKeyDown={(e) => { if (e.key === "Enter") handlePortalImport(); }}
+                />
+                <button
+                  className="primary-button"
+                  onClick={handlePortalImport}
+                  disabled={isPortalImporting || !portalImportUrl.trim()}
+                  style={{ height: 38, padding: "0 16px" }}
+                >
+                  {isPortalImporting ? "Importing…" : "Import Jobs"}
+                </button>
               </div>
-              <div className="terminal-line success">
-                <span>✓</span>
-                <span>IDENTITY: Candidate verified — {profile.email || "st3907@columbia.edu"}.</span>
-              </div>
-              <div className="terminal-line success">
-                <span>✓</span>
-                <span>ENCRYPTION: Session anchored to your private workspace. No data leaves StratumApply.</span>
-              </div>
-              <div className="terminal-line">
-                <span>›</span>
-                <span>STATUS: {selectedPortalForModal.connectionStatus === "connected" ? "ACTIVE — SESSION SYNCED WITH ENGINE" : "READY — CLICK CONNECT BELOW"}</span>
+
+              <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 8 }}>Quick Examples:</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {(selectedPortalForModal.id === "greenhouse"
+                  ? ["openai", "anthropic", "scaleai", "figma", "datadog"]
+                  : ["netflix", "palantir", "affirm", "atlassian"]
+                ).map((slug) => (
+                  <button
+                    key={slug}
+                    className="small-button secondary"
+                    style={{ fontSize: 11, padding: "3px 8px" }}
+                    onClick={() => {
+                      const sampleUrl = selectedPortalForModal.id === "greenhouse"
+                        ? `https://boards.greenhouse.io/${slug}`
+                        : `https://jobs.lever.co/${slug}`;
+                      setPortalImportUrl(sampleUrl);
+                    }}
+                  >
+                    {slug}
+                  </button>
+                ))}
               </div>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
-              <div style={{ padding: "12px", background: "var(--bg-tertiary)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-subtle)" }}>
-                <div style={{ fontSize: 10, fontFamily: "'JetBrains Mono', monospace", color: "var(--text-muted)" }}>CAPABILITY UNLOCKED</div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--accent)", marginTop: 4 }}>{selectedPortalForModal.capability}</div>
-              </div>
-              <div style={{ padding: "12px", background: "var(--bg-tertiary)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-subtle)" }}>
-                <div style={{ fontSize: 10, fontFamily: "'JetBrains Mono', monospace", color: "var(--text-muted)" }}>QUICK CLIPBOARD</div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
-                  <button className="small-button secondary" style={{ fontSize: 10, padding: "2px 6px" }} onClick={() => { navigator.clipboard.writeText(profile.email || ""); setNotice("Email copied!"); }}>📋 Email</button>
-                  <button className="small-button secondary" style={{ fontSize: 10, padding: "2px 6px" }} onClick={() => { navigator.clipboard.writeText(profile.fullName || ""); setNotice("Name copied!"); }}>📋 Name</button>
-                  {profile.linkedin && <button className="small-button secondary" style={{ fontSize: 10, padding: "2px 6px" }} onClick={() => { navigator.clipboard.writeText(profile.linkedin); setNotice("LinkedIn copied!"); }}>📋 LinkedIn</button>}
-                  {profile.portfolio && <button className="small-button secondary" style={{ fontSize: 10, padding: "2px 6px" }} onClick={() => { navigator.clipboard.writeText(profile.portfolio); setNotice("Portfolio copied!"); }}>📋 Portfolio</button>}
-                </div>
-              </div>
-            </div>
-
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, borderTop: "1px solid var(--border-subtle)", paddingTop: 12 }}>
               <button className="small-button secondary" onClick={() => setSelectedPortalForModal(null)}>
                 Close
               </button>
-              {selectedPortalForModal.connectionStatus === "connected" ? (
-                <button
-                  className="primary-button"
-                  onClick={() => disconnectPortal(selectedPortalForModal.id)}
-                  disabled={isConnectingPortal}
-                  style={{ padding: "0 20px", height: 38, background: "rgba(244,63,94,0.1)", color: "#f43f5e", border: "1px solid rgba(244,63,94,0.3)" }}
-                >
-                  {isConnectingPortal ? "Disconnecting…" : "Disconnect Session"}
-                </button>
-              ) : (
-                <button
-                  className="primary-button"
-                  onClick={() => connectPortalInternally(selectedPortalForModal.id)}
-                  disabled={isConnectingPortal}
-                  style={{ padding: "0 20px", height: 38 }}
-                >
-                  {isConnectingPortal ? "Connecting…" : "⚡ Connect Internal Session"}
-                </button>
-              )}
             </div>
           </div>
         </div>

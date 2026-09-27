@@ -13,7 +13,7 @@
 
 import { sql, ensureSchema } from "./db";
 import { randomId } from "./auth-crypto";
-import { discoverFromGreenhouse, discoverFromLever, discoverFromCareerSites } from "./engine-discovery";
+import { discoverFromCareerSites } from "./engine-discovery";
 import { scoreAllDiscoveredJobs, getTopJobs } from "./engine-matcher";
 import { prepareJobs } from "./engine-preparer";
 import { logActivity } from "./activity";
@@ -71,9 +71,9 @@ export function defaultRunConfig(profile: UserProfile): RunConfig {
   return {
     targetRoles,
     targetLocations,
-    sources: ["greenhouse", "lever", "career_sites"],
+    sources: ["greenhouse", "lever"],
     companyFilter: [],
-    maxJobsPerRun: 50,
+    maxJobsPerRun: 25,
   };
 }
 
@@ -249,8 +249,13 @@ export async function startEngine(
     // Greenhouse boards (user can add board tokens in the future — for now use career site directory)
     // Lever boards (same)
     // Career sites directory
-    if (config.sources.includes("career_sites")) {
-      const result = await discoverFromCareerSites(userId, config, run.id);
+    if (config.sources.includes("greenhouse") || config.sources.includes("lever") || config.sources.includes("career_sites")) {
+      const result = await discoverFromCareerSites(userId, {
+        ...config,
+        sources: config.sources.includes("career_sites")
+          ? ["greenhouse", "lever"]
+          : config.sources,
+      }, run.id);
       totalDiscovered += result.jobsNew;
       for (const err of result.errors) {
         errors.push({ message: err, timestamp: new Date().toISOString() });
@@ -283,7 +288,7 @@ export async function startEngine(
     // ── Phase 4: Prepare top jobs ──
     const jobsToPrepare = jobsToQueue
       .sort((a, b) => b.fitScore - a.fitScore)
-      .slice(0, 10);  // Prepare the top 10 in this run
+      .slice(0, 8);
 
     const prepResults = await prepareJobs(
       userId,

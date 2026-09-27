@@ -10,6 +10,7 @@ import {
   deleteDocument,
   detectDocumentKind,
 } from "../../../lib/documents";
+import { extractTextFromFileBuffer } from "../../../lib/cover-letter-extractor";
 import { logActivity } from "../../../lib/activity";
 
 export const runtime = "nodejs";
@@ -49,10 +50,15 @@ export async function POST(request: Request) {
       const name = (formData.get("name") as string) || file.name;
       const kind = (formData.get("kind") as string) || detectDocumentKind(file.name);
 
-      // Read file text content (for text-based files)
+      const bytes = Buffer.from(await file.arrayBuffer());
       let contentText: string | undefined;
-      if (file.type.includes("text") || file.name.endsWith(".txt") || file.name.endsWith(".md")) {
-        contentText = await file.text();
+      try {
+        const extracted = await extractTextFromFileBuffer(bytes, file.name, file.type);
+        if (extracted.trim().length > 20) contentText = extracted.slice(0, 80_000);
+      } catch {
+        if (file.type.includes("text") || file.name.endsWith(".txt") || file.name.endsWith(".md")) {
+          contentText = await file.text();
+        }
       }
 
       const doc = await createDocument(userId, {

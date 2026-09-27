@@ -19,17 +19,18 @@ export type PortalDefinition = {
   accent: string;
   initials: string;
   capability: string;
+  type: "ats_import" | "bookmark";
 };
 
 export const PORTAL_DEFINITIONS: PortalDefinition[] = [
-  { id: "handshake", name: "Handshake", subtitle: "Columbia Engineering campus recruitment", loginUrl: "https://columbiaengineering.joinhandshake.com/login", accent: "#f05d35", initials: "HS", capability: "Campus internships & direct apply" },
-  { id: "linkedin", name: "LinkedIn", subtitle: "Professional network & AI/ML opportunities", loginUrl: "https://www.linkedin.com/login", accent: "#0a66c2", initials: "in", capability: "Easy Apply & recruiter matching" },
-  { id: "greenhouse", name: "Greenhouse", subtitle: "Tech & startup applicant tracking boards", loginUrl: "https://boards.greenhouse.io/", accent: "#00a86b", initials: "GH", capability: "Automated form pre-fill & tracking" },
-  { id: "lever", name: "Lever Co", subtitle: "High-growth tech applications", loginUrl: "https://jobs.lever.co/", accent: "#4285f4", initials: "LV", capability: "1-click ATS application fill" },
-  { id: "workday", name: "Workday", subtitle: "Big Tech & enterprise career portals", loginUrl: "https://www.myworkday.com/", accent: "#f78200", initials: "WD", capability: "Enterprise application profile" },
-  { id: "simplify", name: "Simplify", subtitle: "Job search & autofill copilot", loginUrl: "https://simplify.jobs/", accent: "#7b63d5", initials: "SF", capability: "Application autofill integration" },
-  { id: "jobright", name: "Jobright AI", subtitle: "AI internship & job search engine", loginUrl: "https://jobright.ai/", accent: "#ef9b45", initials: "JR", capability: "Curated AI/ML opportunity radar" },
-  { id: "goinglobal", name: "GoinGlobal", subtitle: "Global & visa-sponsored positions", loginUrl: "https://online.goinglobal.com/", accent: "#258e71", initials: "GG", capability: "International & H-1B opportunities" },
+  { id: "greenhouse", name: "Greenhouse", subtitle: "Public applicant tracking board API", loginUrl: "https://boards.greenhouse.io/", accent: "#00a86b", initials: "GH", capability: "Direct ATS ingest — import live job postings via public API", type: "ats_import" },
+  { id: "lever", name: "Lever Co", subtitle: "Public job postings API", loginUrl: "https://jobs.lever.co/", accent: "#4285f4", initials: "LV", capability: "Direct ATS ingest — import live postings & descriptions via public API", type: "ats_import" },
+  { id: "handshake", name: "Handshake", subtitle: "Columbia Engineering campus recruitment", loginUrl: "https://columbiaengineering.joinhandshake.com/login", accent: "#f05d35", initials: "HS", capability: "Campus recruitment bookmark — open portal in new tab", type: "bookmark" },
+  { id: "linkedin", name: "LinkedIn", subtitle: "Professional network & job listings", loginUrl: "https://www.linkedin.com/login", accent: "#0a66c2", initials: "in", capability: "Professional network bookmark — browse & Easy Apply in new tab", type: "bookmark" },
+  { id: "workday", name: "Workday", subtitle: "Enterprise career portals", loginUrl: "https://www.myworkday.com/", accent: "#f78200", initials: "WD", capability: "Enterprise application bookmark — open company portal in new tab", type: "bookmark" },
+  { id: "simplify", name: "Simplify", subtitle: "Job search & autofill copilot", loginUrl: "https://simplify.jobs/", accent: "#7b63d5", initials: "SF", capability: "Autofill copilot bookmark — open portal in new tab", type: "bookmark" },
+  { id: "jobright", name: "Jobright AI", subtitle: "AI internship & job search engine", loginUrl: "https://jobright.ai/", accent: "#ef9b45", initials: "JR", capability: "AI job search bookmark — open portal in new tab", type: "bookmark" },
+  { id: "goinglobal", name: "GoinGlobal", subtitle: "Global & visa-sponsored positions", loginUrl: "https://online.goinglobal.com/", accent: "#258e71", initials: "GG", capability: "Global career bookmark — open portal in new tab", type: "bookmark" },
 ];
 
 // ─── In-memory fallback ───

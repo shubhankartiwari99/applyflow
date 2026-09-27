@@ -96,7 +96,7 @@ export async function listJobs(
   options?: { status?: JobStatus; source?: string; limit?: number; offset?: number }
 ): Promise<JobRecord[]> {
   const client = sql();
-  const limit = options?.limit ?? 100;
+  const limit = options?.limit ?? 500;
   const offset = options?.offset ?? 0;
 
   if (!client) {
@@ -343,14 +343,24 @@ export async function countJobsByStatus(userId: string): Promise<Record<string, 
  * Check if a job with the same company + role + source already exists for this user.
  * Used to avoid duplicate discoveries.
  */
-export async function jobExists(userId: string, company: string, role: string, source: string): Promise<boolean> {
+export async function jobExists(userId: string, company: string, role: string, source: string, applyUrl?: string): Promise<boolean> {
   const client = sql();
   if (!client) {
-    return Array.from(memJobs.values()).some(
-      (j) => j.userId === userId && j.company === company && j.role === role && j.source === source
-    );
+    return Array.from(memJobs.values()).some((j) => {
+      if (j.userId !== userId) return false;
+      if (applyUrl && j.applyUrl === applyUrl) return true;
+      return j.company === company && j.role === role && j.source === source;
+    });
   }
   await ensureSchema();
+  if (applyUrl) {
+    const byUrl = (await client`
+      SELECT 1 FROM applyflow_jobs
+      WHERE user_id = ${userId} AND apply_url = ${applyUrl}
+      LIMIT 1
+    `) as Array<Record<string, unknown>>;
+    if (byUrl.length > 0) return true;
+  }
   const rows = (await client`
     SELECT 1 FROM applyflow_jobs
     WHERE user_id = ${userId} AND company = ${company} AND role = ${role} AND source = ${source}
