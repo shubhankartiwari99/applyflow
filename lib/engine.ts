@@ -389,3 +389,41 @@ export async function getEngineStatus(userId: string): Promise<{
     jobCounts,
   };
 }
+
+/**
+ * Reset pipeline data for a user — clears all discovered jobs, engine runs,
+ * and engine activity logs to start from an absolute clean zero-slate.
+ */
+export async function resetPipelineData(userId: string): Promise<{
+  jobsDeleted: number;
+  runsDeleted: number;
+}> {
+  // Clear runs from memory fallback
+  let memRunsDeleted = 0;
+  for (const [id, r] of memRuns.entries()) {
+    if (r.userId === userId) {
+      memRuns.delete(id);
+      memRunsDeleted++;
+    }
+  }
+
+  // Clear jobs via jobs helper
+  const { deleteAllJobs } = await import("./jobs");
+  const jobsDeleted = await deleteAllJobs(userId);
+
+  const client = sql();
+  if (!client) {
+    return { jobsDeleted, runsDeleted: memRunsDeleted };
+  }
+
+  await ensureSchema();
+  // Delete activities, runs from database
+  await client`DELETE FROM applyflow_activity_log WHERE user_id = ${userId}`;
+  const runsRes = await client`DELETE FROM applyflow_runs WHERE user_id = ${userId}`;
+
+  return {
+    jobsDeleted,
+    runsDeleted: (runsRes as unknown[]).length ?? 0,
+  };
+}
+

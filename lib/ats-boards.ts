@@ -8,6 +8,7 @@ export type AtsBoard = {
   company: string;
   greenhouse?: string;
   lever?: string;
+  ashby?: string;
 };
 
 export const ATS_BOARDS: AtsBoard[] = [
@@ -47,7 +48,7 @@ export const ATS_BOARDS: AtsBoard[] = [
   { company: "Hugging Face", lever: "huggingface" },
   { company: "Canva", lever: "canva" },
   { company: "Notion", lever: "notion" },
-  { company: "Linear", lever: "linear" },
+  { company: "Linear", ashby: "linear", lever: "linear" },
   { company: "Retool", lever: "retool" },
   { company: "Supabase", lever: "supabase" },
   { company: "Postman", lever: "postman" },
@@ -56,11 +57,22 @@ export const ATS_BOARDS: AtsBoard[] = [
   { company: "Twitch", lever: "twitch" },
   { company: "Lyft", lever: "lyft" },
   { company: "Uber", lever: "uber" },
+  // Ashby ATS Top AI & Tech Leaders
+  { company: "Perplexity AI", ashby: "perplexity" },
+  { company: "Runway ML", ashby: "runway" },
+  { company: "Modal Labs", ashby: "modal" },
+  { company: "Synthesia", ashby: "synthesia" },
+  { company: "Cohere", ashby: "cohere" },
+  { company: "ElevenLabs", ashby: "elevenlabs" },
+  { company: "Harvey AI", ashby: "harvey" },
+  { company: "Replit", ashby: "replit" },
+  { company: "Weights & Biases", ashby: "wandb" },
 ];
 
 export type ParsedBoard =
   | { kind: "greenhouse"; token: string }
-  | { kind: "lever"; token: string };
+  | { kind: "lever"; token: string }
+  | { kind: "ashby"; token: string };
 
 export function parseJobBoardUrl(raw: string): ParsedBoard | null {
   let url: URL;
@@ -91,6 +103,14 @@ export function parseJobBoardUrl(raw: string): ParsedBoard | null {
       ? segments[2]
       : segments[0];
     if (site) return { kind: "lever", token: site };
+  }
+
+  if (host === "jobs.ashbyhq.com" || host === "api.ashbyhq.com") {
+    const segments = url.pathname.split("/").filter(Boolean);
+    const org = host === "api.ashbyhq.com" && segments[0] === "posting-api" && segments[1] === "job-board"
+      ? segments[2]
+      : segments[0];
+    if (org) return { kind: "ashby", token: org };
   }
 
   return null;

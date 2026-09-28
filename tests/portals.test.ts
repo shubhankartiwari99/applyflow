@@ -65,9 +65,9 @@ describe("portals data layer", () => {
     expect(connected[0].portal).toBe("handshake");
   });
 
-  it("classifies greenhouse and lever as ats_import, and other portals as bookmark", () => {
+  it("classifies greenhouse, lever, and ashby as ats_import, and other portals as bookmark", () => {
     for (const portal of PORTAL_DEFINITIONS) {
-      if (portal.id === "greenhouse" || portal.id === "lever") {
+      if (portal.id === "greenhouse" || portal.id === "lever" || portal.id === "ashby") {
         expect(portal.type).toBe("ats_import");
       } else {
         expect(portal.type).toBe("bookmark");

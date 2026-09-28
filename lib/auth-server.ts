@@ -26,7 +26,17 @@ export function clearSessionCookie(response: NextResponse) {
 }
 
 export function userIdFromRequest(request: Request) {
-  const token = request.headers.get("cookie")?.split(";").map((item) => item.trim()).find((item) => item.startsWith(`${SESSION_COOKIE}=`))?.slice(SESSION_COOKIE.length + 1);
+  let token = request.headers.get("cookie")?.split(";").map((item) => item.trim()).find((item) => item.startsWith(`${SESSION_COOKIE}=`))?.slice(SESSION_COOKIE.length + 1);
+  if (!token) {
+    const authHeader = request.headers.get("authorization");
+    if (authHeader?.startsWith("Bearer ")) {
+      token = authHeader.slice(7).trim();
+    }
+  }
+  if (!token && isDemoAuthAllowed()) {
+    const headerUser = request.headers.get("x-user-id");
+    if (headerUser) return headerUser;
+  }
   if (!token) return null;
   const [userId, expiresAtText, signature] = token.split(".");
   if (!userId || !expiresAtText || !signature) return null;

@@ -50,7 +50,12 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const jobs = await listJobs(userId, { source: result.source.startsWith("greenhouse") ? "greenhouse" : "lever", limit: 80 });
+    const sourceFilter = result.source.startsWith("greenhouse")
+      ? "greenhouse"
+      : result.source.startsWith("ashby")
+      ? "ashby"
+      : "lever";
+    const jobs = await listJobs(userId, { source: sourceFilter, limit: 80 });
 
     return NextResponse.json({
       source: result.source,

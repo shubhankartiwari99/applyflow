@@ -1,0 +1,135 @@
+/* StratumApply Floating Capture Widget */
+
+#stratumapply-extension-root {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 2147483647;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: #ffffff;
+  pointer-events: auto;
+  box-sizing: border-box;
+}
+
+#stratumapply-extension-root * {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+#stratumapply-extension-root .stratum-card {
+  width: 280px;
+  background: rgba(13, 17, 23, 0.94);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(0, 229, 153, 0.35);
+  border-radius: 14px;
+  padding: 14px 16px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5), 0 0 20px rgba(0, 229, 153, 0.15);
+  animation: stratumFadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+#stratumapply-extension-root .stratum-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(0, 229, 153, 0.6);
+}
+
+#stratumapply-extension-root .stratum-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+#stratumapply-extension-root .stratum-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #00e599;
+  box-shadow: 0 0 8px #00e599;
+}
+
+#stratumapply-extension-root .stratum-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #00e599;
+}
+
+#stratumapply-extension-root .stratum-job-preview {
+  margin-bottom: 12px;
+}
+
+#stratumapply-extension-root .stratum-role {
+  font-size: 13px;
+  font-weight: 600;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+}
+
+#stratumapply-extension-root .stratum-company {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#stratumapply-extension-root .stratum-btn {
+  width: 100%;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 229, 153, 0.4);
+  background: linear-gradient(135deg, rgba(0, 229, 153, 0.2), rgba(0, 229, 153, 0.08));
+  color: #00e599;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+#stratumapply-extension-root .stratum-btn:hover {
+  background: #00e599;
+  color: #070a0f;
+  box-shadow: 0 0 16px rgba(0, 229, 153, 0.4);
+}
+
+#stratumapply-extension-root .stratum-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+#stratumapply-extension-root .stratum-btn.success {
+  background: #00e599;
+  color: #070a0f;
+  border-color: #00e599;
+}
+
+#stratumapply-extension-root .stratum-btn.error {
+  background: rgba(244, 63, 94, 0.2);
+  color: #f43f5e;
+  border-color: rgba(244, 63, 94, 0.5);
+  font-size: 11px;
+}
+
+@keyframes stratumFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}

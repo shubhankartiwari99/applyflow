@@ -179,7 +179,86 @@ export async function discoverFromLever(
 }
 
 /**
- * Pull live postings from mapped public Greenhouse/Lever boards.
+ * Discover jobs from an Ashby public board.
+ */
+export async function discoverFromAshby(
+  userId: string,
+  orgSlug: string,
+  config: RunConfig,
+  runId?: string
+): Promise<DiscoveryResult> {
+  const errors: string[] = [];
+  let jobsFound = 0;
+  let jobsNew = 0;
+
+  try {
+    const response = await fetch(
+      `https://api.ashbyhq.com/posting-api/job-board/${encodeURIComponent(orgSlug)}`,
+      { headers: { Accept: "application/json" } }
+    );
+
+    if (!response.ok) {
+      errors.push(`Ashby returned ${response.status} for board "${orgSlug}"`);
+      return { source: `ashby:${orgSlug}`, jobsFound: 0, jobsNew: 0, errors };
+    }
+
+    const payload = (await response.json()) as {
+      jobs?: Array<{
+        id?: string;
+        title?: string;
+        department?: string;
+        team?: string;
+        location?: string;
+        secondaryLocations?: Array<{ location?: string }>;
+        jobUrl?: string;
+        descriptionPlain?: string;
+      }>;
+    };
+
+    const ashbyJobs = payload.jobs ?? [];
+    jobsFound = ashbyJobs.length;
+    const company = orgSlug.replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
+    for (const aj of ashbyJobs) {
+      const title = String(aj.title ?? "Untitled");
+      if (!matchesTargetRole(title, config.targetRoles)) continue;
+
+      const applyUrl = aj.jobUrl || `https://jobs.ashbyhq.com/${orgSlug}/${aj.id || ""}`;
+      const exists = await jobExists(userId, company, title, "ashby", applyUrl);
+      if (exists) continue;
+
+      const location = aj.location || "Not listed";
+      const tags: string[] = [];
+      if (aj.department) tags.push(aj.department);
+      if (aj.team && aj.team !== aj.department) tags.push(aj.team);
+      if (EARLY_CAREER.test(title)) tags.push("Internship");
+
+      await createJob(userId, {
+        company,
+        role: title,
+        location,
+        source: "ashby",
+        sourceUrl: applyUrl,
+        applyUrl,
+        fitScore: 0,
+        status: "discovered",
+        tags,
+        accent: "#9945FF",
+        jobDescription: aj.descriptionPlain?.slice(0, 5000) ?? undefined,
+        runId,
+      });
+      jobsNew++;
+      if (jobsNew >= config.maxJobsPerRun) break;
+    }
+  } catch (error) {
+    errors.push(`Ashby discovery failed for "${orgSlug}": ${error instanceof Error ? error.message : "Unknown error"}`);
+  }
+
+  return { source: `ashby:${orgSlug}`, jobsFound, jobsNew, errors };
+}
+
+/**
+ * Pull live postings from mapped public Greenhouse/Lever/Ashby boards.
  * Does not invent company×role stubs for sites without a public ATS API.
  */
 export async function discoverFromCareerSites(
@@ -220,6 +299,16 @@ export async function discoverFromCareerSites(
       jobsNew += result.jobsNew;
       errors.push(...result.errors);
     }
+
+    if (jobsNew >= remaining) break;
+
+    if ((config.sources.includes("ashby") || config.sources.length === 0 || config.sources.includes("greenhouse")) && board.ashby && !seenTokens.has(`as:${board.ashby}`)) {
+      seenTokens.add(`as:${board.ashby}`);
+      const result = await discoverFromAshby(userId, board.ashby, { ...config, maxJobsPerRun: remaining - jobsNew }, runId);
+      jobsFound += result.jobsFound;
+      jobsNew += result.jobsNew;
+      errors.push(...result.errors);
+    }
   }
 
   return { source: "mapped_ats", jobsFound, jobsNew, errors };
@@ -237,13 +326,16 @@ export async function discoverFromUrl(
       source: "unsupported",
       jobsFound: 0,
       jobsNew: 0,
-      errors: ["Only public Greenhouse (boards.greenhouse.io) and Lever (jobs.lever.co) URLs can be imported automatically."],
+      errors: ["Only public Greenhouse, Lever, and Ashby job URLs can be imported automatically. For others, use the StratumApply Chrome Extension to import with one click."],
     };
   }
   if (parsed.kind === "greenhouse") {
     return discoverFromGreenhouse(userId, parsed.token, config, runId);
   }
-  return discoverFromLever(userId, parsed.token, config, runId);
+  if (parsed.kind === "lever") {
+    return discoverFromLever(userId, parsed.token, config, runId);
+  }
+  return discoverFromAshby(userId, parsed.token, config, runId);
 }
 
 /**

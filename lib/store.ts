@@ -87,12 +87,20 @@ async function ensureSchema() {
  * Authenticate an existing user or register a new user using their private passkey.
  * Returns the authenticated user record and a flag indicating if this was a new registration.
  */
+function nameFromEmail(email: string): string {
+  const handle = email.split("@")[0] || "";
+  const parts = handle.split(/[._-]/).filter(Boolean);
+  if (parts.length === 0) return "Candidate";
+  return parts.map((p) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join(" ");
+}
+
 export async function authenticateOrRegisterUser(
   email: string,
   passkey: string
 ): Promise<{ user: StoredUser; isNewUser: boolean }> {
   const hashedEmail = emailHash(email);
   const client = sql();
+  const friendlyName = nameFromEmail(email);
 
   if (!client) {
     let user = memoryUsers.get(hashedEmail);
@@ -104,7 +112,12 @@ export async function authenticateOrRegisterUser(
         emailHash: hashedEmail,
         passwordHash: hash,
         passwordSalt: salt,
-        workspace: {},
+        workspace: {
+          profile: {
+            email,
+            fullName: friendlyName,
+          },
+        },
       };
       memoryUsers.set(hashedEmail, user);
       return { user, isNewUser: true };
@@ -115,6 +128,10 @@ export async function authenticateOrRegisterUser(
       if (!isValid) {
         throw new Error("Incorrect passkey. Please check your password and try again.");
       }
+      if (!user.workspace) user.workspace = {};
+      if (!user.workspace.profile) user.workspace.profile = {};
+      if (!user.workspace.profile.email) user.workspace.profile.email = email;
+      if (!user.workspace.profile.fullName) user.workspace.profile.fullName = friendlyName;
       return { user, isNewUser: false };
     }
 
@@ -122,6 +139,10 @@ export async function authenticateOrRegisterUser(
     const salt = generateSalt();
     user.passwordSalt = salt;
     user.passwordHash = hashPassword(passkey, salt);
+    if (!user.workspace) user.workspace = {};
+    if (!user.workspace.profile) user.workspace.profile = {};
+    if (!user.workspace.profile.email) user.workspace.profile.email = email;
+    if (!user.workspace.profile.fullName) user.workspace.profile.fullName = friendlyName;
     return { user, isNewUser: false };
   }
 
@@ -143,20 +164,49 @@ export async function authenticateOrRegisterUser(
     const id = randomId();
     const salt = generateSalt();
     const hash = hashPassword(passkey, salt);
+    const initialWorkspace: WorkspaceData = {
+      profile: {
+        email,
+        fullName: friendlyName,
+      },
+    };
     await client`
       INSERT INTO applyflow_users (id, email_hash, password_hash, password_salt, workspace)
-      VALUES (${id}, ${hashedEmail}, ${hash}, ${salt}, '{}'::jsonb)
+      VALUES (${id}, ${hashedEmail}, ${hash}, ${salt}, ${JSON.stringify(initialWorkspace)}::jsonb)
     `;
-    return { user: { id, emailHash: hashedEmail, workspace: {} }, isNewUser: true };
+    return { user: { id, emailHash: hashedEmail, workspace: initialWorkspace }, isNewUser: true };
   }
 
   const row = rows[0];
+  const workspace: WorkspaceData = row.workspace ?? {};
+  let workspaceUpdated = false;
+  if (!workspace.profile) {
+    workspace.profile = { email, fullName: friendlyName };
+    workspaceUpdated = true;
+  } else {
+    if (!workspace.profile.email) {
+      workspace.profile.email = email;
+      workspaceUpdated = true;
+    }
+    if (!workspace.profile.fullName) {
+      workspace.profile.fullName = friendlyName;
+      workspaceUpdated = true;
+    }
+  }
+
   if (row.password_hash && row.password_salt) {
     const isValid = verifyPassword(passkey, row.password_salt, row.password_hash);
     if (!isValid) {
       throw new Error("Incorrect passkey. Please check your password and try again.");
     }
-    return { user: { id: row.id, emailHash: row.email_hash, workspace: row.workspace ?? {} }, isNewUser: false };
+    if (workspaceUpdated) {
+      await client`
+        UPDATE applyflow_users 
+        SET workspace = ${JSON.stringify(workspace)}::jsonb, updated_at = NOW() 
+        WHERE id = ${row.id}
+      `;
+    }
+    return { user: { id: row.id, emailHash: row.email_hash, workspace }, isNewUser: false };
   }
 
   // Set passkey if record had null password
@@ -164,10 +214,10 @@ export async function authenticateOrRegisterUser(
   const hash = hashPassword(passkey, salt);
   await client`
     UPDATE applyflow_users 
-    SET password_hash = ${hash}, password_salt = ${salt}, updated_at = NOW() 
+    SET password_hash = ${hash}, password_salt = ${salt}, workspace = ${JSON.stringify(workspace)}::jsonb, updated_at = NOW() 
     WHERE id = ${row.id}
   `;
-  return { user: { id: row.id, emailHash: row.email_hash, workspace: row.workspace ?? {} }, isNewUser: false };
+  return { user: { id: row.id, emailHash: row.email_hash, workspace }, isNewUser: false };
 }
 
 export async function createOtpChallenge(email: string) {

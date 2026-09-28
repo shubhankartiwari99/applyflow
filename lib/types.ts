@@ -87,7 +87,7 @@ export type JobRecord = {
 };
 
 // ─── Portal Connections ───
-export type PortalId = "linkedin" | "handshake" | "greenhouse" | "lever" | "workday" | "goinglobal" | "simplify" | "jobright";
+export type PortalId = "linkedin" | "handshake" | "greenhouse" | "lever" | "ashby" | "workday" | "goinglobal" | "simplify" | "jobright";
 export type PortalStatus = "disconnected" | "connected" | "expired" | "needs_reauth";
 
 export type PortalConnectionRecord = {

@@ -353,6 +353,36 @@ export default function Home() {
   const [selectedPortalForModal, setSelectedPortalForModal] = useState<Portal | null>(null);
   const [portalImportUrl, setPortalImportUrl] = useState("");
   const [isPortalImporting, setIsPortalImporting] = useState(false);
+  const [hubIngestUrl, setHubIngestUrl] = useState("");
+  const [isHubIngesting, setIsHubIngesting] = useState(false);
+  const [hubIngestResult, setHubIngestResult] = useState<string | null>(null);
+
+  async function handleHubIngest(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+    if (!hubIngestUrl.trim()) return;
+    setIsHubIngesting(true);
+    setHubIngestResult(null);
+    try {
+      const res = await fetch("/api/discovery", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: hubIngestUrl.trim() }),
+      });
+      const data = await res.json() as { message?: string; error?: string; jobsNew?: number };
+      if (!res.ok) throw new Error(data.error || "Failed to ingest URL");
+      setHubIngestResult(data.message || "Posting successfully ingested into queue!");
+      setHubIngestUrl("");
+      const jRes = await fetch("/api/jobs");
+      if (jRes.ok) {
+        const d = await jRes.json() as { jobs: Job[] };
+        setJobs(d.jobs);
+      }
+    } catch (err) {
+      setHubIngestResult(err instanceof Error ? err.message : "Error ingesting posting.");
+    } finally {
+      setIsHubIngesting(false);
+    }
+  }
 
   // Custom Companies & Global Search
   const [customCareerSites, setCustomCareerSites] = useState<CareerSite[]>([]);
@@ -400,9 +430,17 @@ export default function Home() {
     fetch("/api/auth/session")
       .then(async (r) => {
         if (!r.ok) { router.replace("/login"); return; }
-        const d = await r.json() as { userId?: string };
+        const d = await r.json() as { userId?: string; profile?: Partial<Profile> };
         if (!d.userId) { router.replace("/login"); return; }
         setSession({ userId: d.userId });
+        if (d.profile && (d.profile.fullName || d.profile.email)) {
+          setProfile((c) => ({
+            ...c,
+            fullName: d.profile?.fullName || c.fullName,
+            email: d.profile?.email || c.email,
+            ...d.profile,
+          }));
+        }
       })
       .catch(() => router.replace("/login"));
   }, [router]);
@@ -465,7 +503,19 @@ export default function Home() {
   }, [profile, hydrated, session]);
 
   // ─── Derived Calculations ───
-  const displayName = profile.fullName.trim() || (profile.email ? profile.email.split("@")[0] : "Candidate");
+  const displayName = useMemo(() => {
+    const name = profile.fullName?.trim();
+    if (name) {
+      return name.split(/\s+/)[0];
+    }
+    const email = profile.email?.trim();
+    if (email && email.includes("@")) {
+      const handle = email.split("@")[0];
+      const clean = handle.split(/[._-]/)[0];
+      if (clean) return clean.charAt(0).toUpperCase() + clean.slice(1);
+    }
+    return "Candidate";
+  }, [profile.fullName, profile.email]);
   const displayInitials = userInitials(profile.fullName || profile.email || "AF");
 
   const jobCounts = useMemo(() => {
@@ -514,6 +564,46 @@ export default function Home() {
       return true;
     });
   }, [filter, domainFilter, jobs, query]);
+
+  // ─── Queue Pagination & Controls ───
+  const QUEUE_PAGE_SIZE = 10;
+  const [queuePage, setQueuePage] = useState(1);
+  const [isResettingPipeline, setIsResettingPipeline] = useState(false);
+
+  useEffect(() => {
+    setQueuePage(1);
+  }, [filter, query, domainFilter]);
+
+  const totalQueuePages = Math.max(1, Math.ceil(filteredJobs.length / QUEUE_PAGE_SIZE));
+  const pagedJobs = useMemo(() => {
+    const start = (queuePage - 1) * QUEUE_PAGE_SIZE;
+    return filteredJobs.slice(start, start + QUEUE_PAGE_SIZE);
+  }, [filteredJobs, queuePage]);
+
+  async function handleResetPipeline() {
+    if (!window.confirm("Are you sure you want to reset your pipeline? This will permanently delete all discovered jobs, engine runs, and activity logs to start fresh from zero.")) {
+      return;
+    }
+    setIsResettingPipeline(true);
+    try {
+      const res = await fetch("/api/jobs?all=true", { method: "DELETE" });
+      if (!res.ok) throw new Error("Reset failed");
+      setJobs([]);
+      setActivities([]);
+      setEngineStatus((prev) => ({
+        ...prev,
+        isRunning: false,
+        latestRun: null,
+        jobCounts: {},
+        recentRuns: [],
+      }));
+      setNotice("Pipeline successfully reset to 0 jobs. Clean slate ready!");
+    } catch {
+      setNotice("Failed to reset pipeline.");
+    } finally {
+      setIsResettingPipeline(false);
+    }
+  }
 
   const liveStats = useMemo(() => [
     { label: "Active Pipeline", value: jobs.length, change: "opportunities tracked", tone: "violet", icon: "⌁" },
@@ -1051,10 +1141,16 @@ export default function Home() {
 
   // ─── Actions: Portals & ATS Ingest ───
   function openPortal(portal: Portal) {
-    const isATS = portal.type === "ats_import" || portal.id === "greenhouse" || portal.id === "lever";
+    const isATS = portal.type === "ats_import" || portal.id === "greenhouse" || portal.id === "lever" || portal.id === "ashby";
     if (isATS) {
       setSelectedPortalForModal(portal);
-      setPortalImportUrl(portal.id === "greenhouse" ? "https://boards.greenhouse.io/" : "https://jobs.lever.co/");
+      setPortalImportUrl(
+        portal.id === "greenhouse"
+          ? "https://boards.greenhouse.io/"
+          : portal.id === "ashby"
+          ? "https://jobs.ashbyhq.com/"
+          : "https://jobs.lever.co/"
+      );
     } else {
       window.open(portal.loginUrl, "_blank", "noopener,noreferrer");
       setNotice(`Opened ${portal.name} in a new tab.`);
@@ -1069,6 +1165,8 @@ export default function Home() {
         target = `https://boards.greenhouse.io/${target}`;
       } else if (selectedPortalForModal.id === "lever") {
         target = `https://jobs.lever.co/${target}`;
+      } else if (selectedPortalForModal.id === "ashby") {
+        target = `https://jobs.ashbyhq.com/${target}`;
       }
     }
     setIsPortalImporting(true);
@@ -1171,73 +1269,284 @@ export default function Home() {
   // ─── Render View Sections ───
   const renderWorkspacePage = () => {
     // ══════════════════════════════════════════════════════════════════
-    // 1. CAREER PORTALS & ATS LOGINS HUB
+    // 1. CHROME EXTENSION & UNIVERSAL INGESTION HUB
     // ══════════════════════════════════════════════════════════════════
     if (activeSection === "portals") {
       return (
         <>
           <section className="subpage-hero">
             <div>
-              <div className="eyebrow"><span className="eyebrow-line" />INTERNAL GATEWAY & PORTALS</div>
-              <h1>Career Portals & ATS Ingest</h1>
-              <p>Directly ingest live postings from Greenhouse & Lever via public ATS APIs, and launch bookmarks for external career portals.</p>
+              <div className="eyebrow"><span className="eyebrow-line" />BROWSER INGESTION & ATS INTEGRATIONS</div>
+              <h1>Chrome Extension & Ingestion Hub</h1>
+              <p>
+                Eliminate fake portal logins and credential security risks. With the <strong>StratumApply Chrome Extension</strong>, browse your normal authenticated sessions on <strong>LinkedIn, Handshake, Workday, and Indeed</strong>—extracting full JDs and autofilling applications in 1 click.
+              </p>
             </div>
-            <span className="privacy-chip"><Icon name="shield" /> Real ATS APIs · No Fake Logins</span>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+              <span className="privacy-chip" style={{ background: "rgba(0, 229, 153, 0.12)", color: "var(--accent)", border: "1px solid rgba(0, 229, 153, 0.3)" }}>
+                🧩 Chrome Extension v1.0.0 Ready
+              </span>
+              <span className="privacy-chip"><Icon name="shield" /> 100% Client-Side Privacy</span>
+              <span className="privacy-chip" style={{ color: "var(--blue)", borderColor: "rgba(56, 189, 248, 0.25)", background: "rgba(56, 189, 248, 0.08)" }}>
+                ⚡ 3 Direct ATS APIs (Greenhouse, Lever, Ashby)
+              </span>
+            </div>
           </section>
 
-          <div className="portal-grid">
-            {portals.length === 0 ? (
-              <div className="empty-state" style={{ gridColumn: "1/-1", padding: 40 }}>
-                <div>🔗</div>
-                <strong>Loading portals…</strong>
-                <span>Loading configured platforms and ATS sources.</span>
+          {/* Direct URL Ingest Bar */}
+          <div className="form-card" style={{ marginBottom: 22, background: "linear-gradient(135deg, rgba(0, 229, 153, 0.04), transparent)", borderColor: "rgba(0, 229, 153, 0.2)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+              <div>
+                <h3 style={{ fontSize: 14, fontWeight: 700, color: "var(--text-primary)" }}>⚡ Direct Job URL Quick-Ingest</h3>
+                <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "2px 0 0" }}>
+                  Paste any job posting or ATS board URL (Greenhouse, Lever, or Ashby) to immediately analyze and stage it in your queue.
+                </p>
               </div>
-            ) : portals.map((portal) => {
-              const isATS = portal.type === "ats_import" || portal.id === "greenhouse" || portal.id === "lever";
-              return (
-                <div key={portal.id} className="portal-card">
-                  <div className="portal-card-top">
-                    <div className="portal-logo" style={{ background: `${portal.accent}20`, color: portal.accent }}>{portal.initials}</div>
-                    <div>
-                      <h3>{portal.name}</h3>
-                      <p>{portal.subtitle}</p>
-                    </div>
-                    <span className={`portal-status ${isATS ? "ready" : "not-connected"}`}>
-                      {isATS ? "● Public ATS API" : "↗ Portal Bookmark"}
-                    </span>
-                  </div>
-                  <div className="portal-capability"><Icon name="shield" /> {portal.capability}</div>
-                  <div className="portal-card-actions">
-                    {isATS ? (
-                      <button
-                        className="primary-button"
-                        style={{ width: "100%", height: 36, fontSize: 12 }}
-                        onClick={() => openPortal(portal)}
-                      >
-                        ⚡ Import Jobs from Board
-                      </button>
-                    ) : (
-                      <button
-                        className="small-button secondary"
-                        style={{ width: "100%", height: 36, fontSize: 12 }}
-                        onClick={() => {
-                          window.open(portal.loginUrl, "_blank", "noopener,noreferrer");
-                          setNotice(`Opened ${portal.name} in a new tab.`);
-                        }}
-                      >
-                        Open in New Tab ↗
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+            </div>
+            <form onSubmit={handleHubIngest} style={{ display: "flex", gap: 8 }}>
+              <input
+                className="login-input"
+                style={{ flex: 1, height: 40 }}
+                placeholder="e.g. https://jobs.ashbyhq.com/perplexity/... or https://boards.greenhouse.io/stripe/jobs/..."
+                value={hubIngestUrl}
+                onChange={(e) => setHubIngestUrl(e.target.value)}
+              />
+              <button
+                type="submit"
+                className="primary-button"
+                style={{ height: 40, padding: "0 18px", fontSize: 12, flexShrink: 0 }}
+                disabled={isHubIngesting || !hubIngestUrl.trim()}
+              >
+                {isHubIngesting ? "Analyzing & Ingesting…" : "⚡ Ingest Posting"}
+              </button>
+            </form>
+            {hubIngestResult && (
+              <div style={{ marginTop: 10, fontSize: 11, color: hubIngestResult.includes("Error") ? "var(--rose)" : "var(--accent)", padding: "8px 12px", background: "rgba(0,0,0,0.2)", borderRadius: 6 }}>
+                {hubIngestResult}
+              </div>
+            )}
           </div>
 
+          {/* Chrome Extension Setup & Features Card */}
+          <div className="extension-hero-card" style={{ marginBottom: 24, padding: 22, border: "1px solid rgba(124, 103, 255, 0.3)", borderRadius: "var(--radius-lg)", background: "linear-gradient(135deg, rgba(124, 103, 255, 0.08), rgba(0, 229, 153, 0.03))" }}>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
+              <div>
+                <span className="card-kicker" style={{ color: "var(--violet)" }}>UNIVERSAL BROWSER EXTENSION</span>
+                <h2 style={{ fontSize: 18, fontWeight: 700, margin: "4px 0 8px", color: "#fff" }}>
+                  StratumApply Copilot for Chrome
+                </h2>
+                <p style={{ fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.6, maxWidth: 680 }}>
+                  Because platforms like LinkedIn, Handshake, and Workday require university 2FA and user sessions, our Chrome Extension runs directly in your active browser tabs. It auto-detects job postings, captures full job descriptions with one click, and autofills applications using your tailored cover letters.
+                </p>
+              </div>
+              <div style={{ padding: "8px 14px", borderRadius: 8, background: "rgba(124, 103, 255, 0.15)", border: "1px solid rgba(124, 103, 255, 0.3)", textAlign: "center", flexShrink: 0 }}>
+                <span style={{ fontSize: 20 }}>🧩</span>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#fff", marginTop: 2 }}>v1.0.0</div>
+                <div style={{ fontSize: 9, color: "var(--violet)" }}>Manifest V3</div>
+              </div>
+            </div>
+
+            {/* 3-Step Setup */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginTop: 18 }}>
+              <div style={{ padding: 14, borderRadius: 8, background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-default)" }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--accent)" }}>Step 1: Open Chrome Extensions</div>
+                <div style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 4 }}>
+                  Navigate to <code style={{ color: "var(--cyan)", background: "rgba(255,255,255,0.06)", padding: "2px 4px", borderRadius: 4 }}>chrome://extensions</code> in your browser.
+                </div>
+              </div>
+              <div style={{ padding: 14, borderRadius: 8, background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-default)" }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--accent)" }}>Step 2: Enable Developer Mode</div>
+                <div style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 4 }}>
+                  Toggle the <strong>Developer mode</strong> switch in the top-right corner of the page.
+                </div>
+              </div>
+              <div style={{ padding: 14, borderRadius: 8, background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-default)" }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--accent)" }}>Step 3: Load Unpacked</div>
+                <div style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 4 }}>
+                  Click <strong>Load unpacked</strong> and select the <code style={{ color: "var(--cyan)", background: "rgba(255,255,255,0.06)", padding: "2px 4px", borderRadius: 4 }}>/extension</code> folder in this project.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Supported Channels Grid */}
+          <div className="subpage-section-heading">
+            <h2>Connected Platforms & Ingestion Channels</h2>
+            <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "4px 0 0" }}>
+              How StratumApply interacts with each career portal and applicant tracking system
+            </p>
+          </div>
+
+          <div className="portal-grid" style={{ marginTop: 14 }}>
+            {[
+              {
+                id: "linkedin",
+                name: "LinkedIn Jobs",
+                subtitle: "Professional network & Easy Apply",
+                accent: "#0a66c2",
+                initials: "in",
+                tag: "🧩 Universal Browser Ext",
+                description: "Captures full job title, company, requirements, and JD from active LinkedIn job cards into your queue with 1 click.",
+                url: "https://www.linkedin.com/jobs/",
+                actionLabel: "Open LinkedIn ↗",
+                isATS: false,
+              },
+              {
+                id: "handshake",
+                name: "Handshake",
+                subtitle: "Columbia & University campus recruitment",
+                accent: "#f05d35",
+                initials: "HS",
+                tag: "🧩 Campus Portal Ext",
+                description: "Seamlessly runs within your authenticated university session. Extracts campus deadlines, role qualifications, and application links.",
+                url: "https://columbiaengineering.joinhandshake.com/jobs",
+                actionLabel: "Open Handshake ↗",
+                isATS: false,
+              },
+              {
+                id: "workday",
+                name: "Workday Enterprise",
+                subtitle: "Global corporate job portals",
+                accent: "#f78200",
+                initials: "WD",
+                tag: "🧩 Enterprise ATS Ext",
+                description: "Extracts role requirements across all myworkdayjobs.com domains and assists with autofill on multi-page applications.",
+                url: "https://www.myworkday.com/",
+                actionLabel: "Open Workday ↗",
+                isATS: false,
+              },
+              {
+                id: "greenhouse",
+                name: "Greenhouse ATS",
+                subtitle: "Public boards API & client autofill",
+                accent: "#00a86b",
+                initials: "GH",
+                tag: "⚡ Direct API + Ext",
+                description: "Auto-discovers live openings via public JSON API, plus extension autofills custom questions and cover letters on application forms.",
+                url: "https://boards.greenhouse.io/",
+                actionLabel: "⚡ Sync Board Jobs",
+                isATS: true,
+              },
+              {
+                id: "lever",
+                name: "Lever Co",
+                subtitle: "Public postings API & client autofill",
+                accent: "#4285f4",
+                initials: "LV",
+                tag: "⚡ Direct API + Ext",
+                description: "Background engine discovers open postings across 40+ top tech boards. Extension pre-fills fields with 1 click on submit pages.",
+                url: "https://jobs.lever.co/",
+                actionLabel: "⚡ Sync Board Jobs",
+                isATS: true,
+              },
+              {
+                id: "ashby",
+                name: "Ashby HQ",
+                subtitle: "Modern AI & high-growth startup ATS",
+                accent: "#9945FF",
+                initials: "AS",
+                tag: "⚡ Direct API + Ext",
+                description: "Direct API integration for top AI innovators (Perplexity, Runway, Synthesia, Modal, Cohere). Extension autofills all applicant fields.",
+                url: "https://jobs.ashbyhq.com/",
+                actionLabel: "⚡ Sync Board Jobs",
+                isATS: true,
+              },
+              {
+                id: "indeed",
+                name: "Indeed & Career Sites",
+                subtitle: "Universal Schema.org JSON-LD ingest",
+                accent: "#2164f3",
+                initials: "ID",
+                tag: "🧩 Universal DOM Ext",
+                description: "Extension auto-detects structured JobPosting microdata on any website on the internet, turning arbitrary pages into pipeline entries.",
+                url: "https://www.indeed.com/",
+                actionLabel: "Open Indeed ↗",
+                isATS: false,
+              },
+              {
+                id: "custom",
+                name: "Custom ATS & Tech Directory",
+                subtitle: "Curated directory & manual entry",
+                accent: "#00E599",
+                initials: "✦",
+                tag: "⚡ Instant Ingest",
+                description: "Paste any company career page or job listing link into the intake bar above or browse the 50+ curated companies in Job Radar.",
+                url: "#",
+                actionLabel: "Browse Tech Directory ↗",
+                isATS: false,
+              },
+            ].map((channel) => (
+              <div key={channel.id} className="portal-card" style={{ display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                <div>
+                  <div className="portal-card-top">
+                    <div className="portal-logo" style={{ background: `${channel.accent}20`, color: channel.accent }}>
+                      {channel.initials}
+                    </div>
+                    <div>
+                      <h3>{channel.name}</h3>
+                      <p>{channel.subtitle}</p>
+                    </div>
+                    <span className="portal-status ready" style={{ color: channel.accent, borderColor: `${channel.accent}40` }}>
+                      {channel.tag}
+                    </span>
+                  </div>
+                  <p style={{ fontSize: 11, color: "var(--text-secondary)", lineHeight: 1.5, margin: "12px 0 0" }}>
+                    {channel.description}
+                  </p>
+                </div>
+                <div className="portal-card-actions" style={{ marginTop: 14 }}>
+                  {channel.isATS ? (
+                    <button
+                      className="primary-button"
+                      style={{ width: "100%", height: 34, fontSize: 11 }}
+                      onClick={() => {
+                        const p = portals.find((x) => x.id === channel.id) ?? {
+                          id: channel.id as any,
+                          name: channel.name,
+                          subtitle: channel.subtitle,
+                          loginUrl: channel.url,
+                          accent: channel.accent,
+                          initials: channel.initials,
+                          capability: channel.description,
+                          type: "ats_import" as const,
+                          connectionStatus: "connected" as const,
+                          lastSyncedAt: null,
+                        };
+                        openPortal(p);
+                      }}
+                    >
+                      {channel.actionLabel}
+                    </button>
+                  ) : channel.url !== "#" ? (
+                    <button
+                      className="small-button secondary"
+                      style={{ width: "100%", height: 34, fontSize: 11 }}
+                      onClick={() => {
+                        window.open(channel.url, "_blank", "noopener,noreferrer");
+                        setNotice(`Opened ${channel.name} in a new tab.`);
+                      }}
+                    >
+                      {channel.actionLabel}
+                    </button>
+                  ) : (
+                    <button
+                      className="primary-button"
+                      style={{ width: "100%", height: 34, fontSize: 11 }}
+                      onClick={() => setActiveSection("discovery")}
+                    >
+                      {channel.actionLabel}
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Privacy & Guardrail Note */}
           <div className="portal-note" style={{ marginTop: 24, border: "1px solid rgba(0, 229, 153, 0.25)", background: "rgba(0, 229, 153, 0.04)" }}>
-            <span style={{ color: "var(--accent)" }}>⬡</span>
+            <span style={{ color: "var(--accent)" }}>🛡</span>
             <div>
-              <strong style={{ color: "#fff" }}>Honest ATS & Portal Architecture:</strong> StratumApply uses official public ATS endpoints (Greenhouse & Lever) to fetch live job postings and job descriptions without needing authentication or fake logins. For campus and enterprise platforms (Handshake, LinkedIn, Workday), use the portal links to launch external pages directly in your browser.
+              <strong style={{ color: "#fff" }}>Why the Extension Architecture is 100x Superior:</strong> Centralized servers attempting to log into LinkedIn or Handshake get IP banned, triggered by CAPTCHA, or locked out by Duo 2FA. With the StratumApply Chrome Extension, your credentials never leave your browser, your passwords are never sent to any server, and your actions are 100% legitimate user activity.
             </div>
           </div>
         </>
@@ -1976,6 +2285,26 @@ export default function Home() {
               </div>
             </div>
 
+            <div className="form-card" style={{ borderColor: "rgba(244, 63, 94, 0.25)", background: "linear-gradient(135deg, rgba(244, 63, 94, 0.03), transparent)" }}>
+              <div className="subpage-section-heading">
+                <h2 style={{ color: "var(--rose)" }}>Pipeline Zero-Slate Reset</h2>
+                <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "4px 0 0" }}>
+                  Purge all discovered jobs, application queue records, engine runs, and activity records back to zero. Your profile information, resume documents, and login credentials remain preserved.
+                </p>
+              </div>
+              <div style={{ marginTop: 14 }}>
+                <button
+                  type="button"
+                  className="small-button"
+                  style={{ background: "var(--rose-muted)", color: "var(--rose)", borderColor: "rgba(244, 63, 94, 0.3)" }}
+                  onClick={handleResetPipeline}
+                  disabled={isResettingPipeline}
+                >
+                  {isResettingPipeline ? "Resetting Pipeline…" : "Reset Pipeline to 0 (Clean Slate)"}
+                </button>
+              </div>
+            </div>
+
             <div className="form-actions">
               <span>{profileSaved ? "✓ Profile saved to encrypted workspace" : "Changes auto-sync to your secure database"}</span>
               <button type="submit" className="primary-button">{profileSaved ? "Saved ✓" : "Save Changes"}</button>
@@ -2121,9 +2450,21 @@ export default function Home() {
                   </button>
                 ))}
               </div>
-              <div className="queue-search">
-                <Icon name="search" />
-                <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Filter queue…" />
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                {jobs.length > 0 && (
+                  <button
+                    className="reset-queue-btn"
+                    onClick={handleResetPipeline}
+                    disabled={isResettingPipeline}
+                    title="Clear all pipeline jobs and start fresh from zero"
+                  >
+                    <span>↺</span> {isResettingPipeline ? "Resetting…" : "Reset Pipeline"}
+                  </button>
+                )}
+                <div className="queue-search">
+                  <Icon name="search" />
+                  <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Filter queue…" />
+                </div>
               </div>
             </div>
 
@@ -2135,7 +2476,7 @@ export default function Home() {
                   <span>Click &quot;START AUTOMATION ENGINE&quot; to scan across AI/ML engineering, Data Science, and Quantitative roles at 30+ top tech companies.</span>
                 </div>
               ) : (
-                filteredJobs.map((job) => (
+                pagedJobs.map((job) => (
                   <div key={job.id} className="job-card" role="button" tabIndex={0}
                     style={{ cursor: "pointer" }}
                     onClick={() => openReview(job)}
@@ -2177,29 +2518,81 @@ export default function Home() {
                 ))
               )}
             </div>
+
+            {filteredJobs.length > 0 && (
+              <div className="queue-pagination">
+                <div className="pagination-info">
+                  Showing <strong>{(queuePage - 1) * QUEUE_PAGE_SIZE + 1}</strong>–<strong>{Math.min(queuePage * QUEUE_PAGE_SIZE, filteredJobs.length)}</strong> of <strong>{filteredJobs.length}</strong> opportunities
+                </div>
+                <div className="pagination-actions">
+                  <button
+                    className="pagination-btn"
+                    disabled={queuePage <= 1}
+                    onClick={() => setQueuePage((p) => Math.max(1, p - 1))}
+                  >
+                    ← Previous
+                  </button>
+                  <div className="pagination-pages">
+                    {Array.from({ length: totalQueuePages }, (_, i) => i + 1).map((pg) => {
+                      if (totalQueuePages > 7 && Math.abs(pg - queuePage) > 2 && pg !== 1 && pg !== totalQueuePages) {
+                        if (pg === 2 || pg === totalQueuePages - 1) return <span key={pg} className="pagination-ellipsis">…</span>;
+                        return null;
+                      }
+                      return (
+                        <button
+                          key={pg}
+                          className={`pagination-page-pill${queuePage === pg ? " active" : ""}`}
+                          onClick={() => setQueuePage(pg)}
+                        >
+                          {pg}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <button
+                    className="pagination-btn"
+                    disabled={queuePage >= totalQueuePages}
+                    onClick={() => setQueuePage((p) => Math.min(totalQueuePages, p + 1))}
+                  >
+                    Next →
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Right Rail Dashboard Intel */}
           <div className="right-rail">
-            {/* Portals Status Card */}
+            {/* Ingestion & Extension Channels Card */}
             <div className="rail-card run-card">
               <div className="rail-card-heading">
                 <div>
-                  <span className="card-kicker">PORTALS & SESSIONS</span>
-                  <h3>Active Logins</h3>
+                  <span className="card-kicker">INGESTION & EXTENSION</span>
+                  <h3>Active Channels</h3>
                 </div>
-                <button className="small-button secondary" onClick={() => setActiveSection("portals")} style={{ padding: "2px 8px", fontSize: 10 }}>Manage</button>
+                <button className="small-button secondary" onClick={() => setActiveSection("portals")} style={{ padding: "2px 8px", fontSize: 10 }}>Hub ↗</button>
               </div>
               <div className="run-breakdown" style={{ marginTop: 12 }}>
-                {portals.slice(0, 5).map((p) => (
-                  <div key={p.id}>
-                    <span className="breakdown-dot" style={{ background: p.connectionStatus === "connected" ? "var(--green)" : "var(--text-muted)" }} />
-                    {p.name}
-                    <strong style={{ color: p.connectionStatus === "connected" ? "var(--green)" : "var(--text-muted)" }}>
-                      {p.connectionStatus === "connected" ? "Connected" : "Inactive"}
-                    </strong>
-                  </div>
-                ))}
+                <div>
+                  <span className="breakdown-dot" style={{ background: "var(--accent)" }} />
+                  Chrome Extension
+                  <strong style={{ color: "var(--accent)" }}>Ready</strong>
+                </div>
+                <div>
+                  <span className="breakdown-dot" style={{ background: "var(--green)" }} />
+                  Direct ATS (GH/Lever/Ashby)
+                  <strong style={{ color: "var(--green)" }}>55+ Boards</strong>
+                </div>
+                <div>
+                  <span className="breakdown-dot" style={{ background: "var(--blue)" }} />
+                  LinkedIn & Handshake
+                  <strong style={{ color: "var(--blue)" }}>Via Ext</strong>
+                </div>
+                <div>
+                  <span className="breakdown-dot" style={{ background: "var(--violet)" }} />
+                  Workday Enterprise
+                  <strong style={{ color: "var(--violet)" }}>Via Ext</strong>
+                </div>
               </div>
             </div>
 
@@ -2307,7 +2700,7 @@ export default function Home() {
         <nav className="main-nav">
           {[
             { id: "overview" as Section, icon: "grid", label: "Mission Control", count: null },
-            { id: "portals" as Section, icon: "portal", label: "Portal Logins", count: portals.filter((p) => p.connectionStatus === "connected").length || null },
+            { id: "portals" as Section, icon: "portal", label: "Extension & Ingestion Hub", count: null },
             { id: "documents" as Section, icon: "file", label: "Documents & Corpus", count: coverLetters.length || null },
             { id: "studio" as Section, icon: "pen", label: "AI Cover Letter Studio", count: null },
             { id: "discovery" as Section, icon: "search", label: "Job Radar & ATS", count: null },
@@ -2326,11 +2719,11 @@ export default function Home() {
           ))}
         </nav>
 
-        <div className="nav-section-label source-label">PORTAL CHANNELS</div>
+        <div className="nav-section-label source-label">INGESTION CHANNELS</div>
         <div className="source-list">
-          <div className="source-row"><span className="source-dot green-dot" />Handshake & LinkedIn<span>active</span></div>
-          <div className="source-row"><span className="source-dot green-dot" />Greenhouse & Lever<span>active</span></div>
-          <div className="source-row"><span className="source-dot blue-dot" />Tech & FinTech Directory<span>30+</span></div>
+          <div className="source-row"><span className="source-dot green-dot" />Chrome Extension: LinkedIn & Handshake<span>active</span></div>
+          <div className="source-row"><span className="source-dot green-dot" />ATS APIs: Greenhouse, Lever, Ashby<span>active</span></div>
+          <div className="source-row"><span className="source-dot blue-dot" />Tech & FinTech Directory<span>55+</span></div>
         </div>
 
         <div className="sidebar-footer">

@@ -94,4 +94,28 @@ describe("Jobs and Documents API handlers", () => {
     expect(data.document.kind).toBe("resume");
     expect(data.document.contentText).toContain("Columbia University");
   });
+
+  it("resets all user jobs when calling DELETE /api/jobs?all=true", async () => {
+    const resetUser = "user_reset_test";
+    await createJob(resetUser, { company: "Notion", role: "SWE", source: "greenhouse" });
+    await createJob(resetUser, { company: "Linear", role: "Design", source: "lever" });
+
+    const cookie = makeAuthCookie(resetUser);
+    const { DELETE: deleteJobs } = await import("../app/api/jobs/route");
+
+    const req = new Request("http://localhost:3000/api/jobs?all=true", {
+      method: "DELETE",
+      headers: { cookie },
+    });
+
+    const res = await deleteJobs(req);
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.ok).toBe(true);
+    expect(data.jobsDeleted).toBeGreaterThanOrEqual(2);
+
+    const checkJob = await getJob(resetUser, "nonexistent");
+    expect(checkJob).toBeNull();
+  });
 });
+

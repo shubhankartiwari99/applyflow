@@ -317,6 +317,24 @@ export async function deleteJob(userId: string, jobId: string): Promise<boolean>
   return true;
 }
 
+/** Delete all jobs for a user */
+export async function deleteAllJobs(userId: string): Promise<number> {
+  const client = sql();
+  if (!client) {
+    let count = 0;
+    for (const [id, job] of memJobs.entries()) {
+      if (job.userId === userId) {
+        memJobs.delete(id);
+        count++;
+      }
+    }
+    return count;
+  }
+  await ensureSchema();
+  const res = await client`DELETE FROM applyflow_jobs WHERE user_id = ${userId}`;
+  return (res as unknown[]).length ?? 0;
+}
+
 /** Count jobs by status for a user */
 export async function countJobsByStatus(userId: string): Promise<Record<string, number>> {
   const client = sql();
